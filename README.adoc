@@ -3,7 +3,58 @@
 This repository holds code to implement standard and fast serial IEC 
 as used in the Commodore C128, using not a CIA but a VIA shift register.
 
-== Types of programs
+== Files
+
+=== Install files
+
+These files install the necessary drivers
+
+dosromldr.a65::
+	Loads a fast serial driver into Ulti-PET memory and links it
+	into the kernel using:
+doscomcomp.a65::
+	code that patches the driver into the kernel
+upet-fiec-core.a65::
+	The fast serial code using the VIA shift register for rx and tx
+upet-fiec-esr-core.a65::
+	The fast serial code using the VIA shift register for tx and an external
+	hardware shift register for rx
+
+
+=== Command files
+
+The Command files are made such that they build for different platforms:
+
+iec*.a65::
+	These are the source files for various commands (as described below)
+dos*::
+	Those files use the new fast IEC code with the shift register on the Ulti-PET
+cbm*::
+	Those files use the standard kernal code - that may use faster routines if loaded
+
+This is the list of commands currently available:
+
+i0::
+	initialize drive 0
+tst::
+	print the disk status
+cat::
+	print the disk catalog (directory) in drive 0
+fmt::
+	format disk in drive 0
+mkdata::
+	Create and write a 64k size file with pseudo random data
+vfdata::
+	Read and verify the 64k file with pseudo random data
+scr::
+	Delete (Scratch) the 64k file
+val::
+	Validate the disk (DOS V command)
+
+=== Info files
+
+There are a couple of disassembly files from the 1571 and the C128 that should help
+understand how the fast serial works.
 
 
 == Supported Platforms
