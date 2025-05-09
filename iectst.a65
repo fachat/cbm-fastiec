@@ -3,20 +3,7 @@
  * 
  */
 
-STATUS		=$96
-
-TALK2		=$f0d2
-LISTEN2		=$f0d5
-SECTALK		=$f193
-SECLISTEN	=$f143
-UNTALK		=$f1ae
-UNLISTEN	=$f1b9
-IECOUT		=$f19e
-IECIN		=$f1c0
-
-curdev	=$d4
-
-DEV	=10
+DEV	=9
 
 	.word $0401
 	*=$0401
@@ -27,8 +14,13 @@ DEV	=10
 eol	.word 0			; BASIC link pointer, 0 means end of code
 	.dsb 1040-*
 
+	jmp start
+
+#include CORE
+
 start
 inc $8000+39
+	jsr fiec_init
 
 	.(
 	lda #0
@@ -81,12 +73,6 @@ print	jsr $ffd2
 	jsr UNTALK
 	rts
 	.)
-
-TALK	sta curdev
-	jmp TALK2
-
-LISTEN	sta curdev
-	jmp LISTEN2
 
 #include "common.a65"
 

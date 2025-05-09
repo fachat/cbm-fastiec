@@ -3,7 +3,7 @@
  * Verify a file with 64k of pseudo random data
  */
 
-DEV	=9
+DEV	=10
 
 	.word $0401
 	*=$0401
@@ -14,8 +14,11 @@ DEV	=9
 eol	.word 0			; BASIC link pointer, 0 means end of code
 	.dsb 1040-*
 
+	jmp start
+
+#include CORE
+
 start
-	jsr fiec_init
 
 	jsr vf64kfile
 
@@ -61,13 +64,16 @@ le
 	lda #0
 	sta counter
 	sta counter+1
-	sta counter+3
+	sta counter+2
 	sta biterrs
 	sta biterrs+1
 	sta biterrs+2
 	sta accum
 	sta accum+1
 	sta accum+2
+
+	lda #0
+	sta STATUS
 
 	; write the file
 	lda #DEV
@@ -183,7 +189,7 @@ hex3out         lda cbase+2,x
                 lda cbase,x
 		jmp hexout
 
-descr		.asc "1 RX, 2 EXPECT, 3 XOR",13
+descr		.asc "1 RX, 2 EXPECT, 3 XOR",13,0
 
 stats1          .asc 13
                 .asc "STATISTICS:",13
@@ -202,5 +208,4 @@ byte	.byt 0
 
 #include "common.a65"
 
-#include "upet-fiec-core.a65"
 

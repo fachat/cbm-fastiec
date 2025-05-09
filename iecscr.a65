@@ -1,12 +1,6 @@
 
 /*
- * this file installs the dosrom driver in bank 7 and patches the BASIC 4 ROM
- * to include the ROM usb companion functions.
- *
- * Therefore, at the end of this file, a page of companion code is expected that is
- * installed into $dfxx in BASIC ROM.
- * After that, up to 16k of USB driver code and data are expected, that are copied
- * to $1000 in bank 7 (where the USB driver code resides)
+ * Delete the pseudo64k file
  */
 
 DEV	=9
@@ -19,6 +13,10 @@ DEV	=9
 	.byt $9e, "1040", 0	; BASIC code (tokenized)
 eol	.word 0			; BASIC link pointer, 0 means end of code
 	.dsb 1040-*
+
+	jmp start
+
+#include CORE
 
 start
 	jsr fiec_init
@@ -50,10 +48,9 @@ le
 	jsr UNLISTEN
 	rts
 
-cmd	.asc "N0:TEST,22",0
+cmd	.asc "S0:PSEUDO64K",0
 
 	.)
 
 #include "common.a65"
 
-#include "upet-fiec-core.a65"

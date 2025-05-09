@@ -3,7 +3,7 @@
  * creates a 64k size file with pseudo-random data
  */
 
-DEV	=9
+DEV	=10
 
 	.word $0401
 	*=$0401
@@ -14,8 +14,11 @@ DEV	=9
 eol	.word 0			; BASIC link pointer, 0 means end of code
 	.dsb 1040-*
 
+	jmp start
+
+#include CORE
+
 start
-	jsr fiec_init
 
 	jsr mk64kfile
 
@@ -97,5 +100,4 @@ counter	.word 0
 
 #include "common.a65"
 
-#include "upet-fiec-core.a65"
 

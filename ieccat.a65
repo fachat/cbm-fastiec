@@ -1,12 +1,6 @@
 
 /*
- * this file installs the dosrom driver in bank 7 and patches the BASIC 4 ROM
- * to include the ROM usb companion functions.
- *
- * Therefore, at the end of this file, a page of companion code is expected that is
- * installed into $dfxx in BASIC ROM.
- * After that, up to 16k of USB driver code and data are expected, that are copied
- * to $1000 in bank 7 (where the USB driver code resides)
+ * read and list the catalog (directory) of the disk
  */
 
 DEV	=10
@@ -26,6 +20,8 @@ start
 	jsr read_dir
 
 	rts
+
+#include CORE
 
 	; ---------------------------------------------
 	; read and print the disk directory
@@ -136,5 +132,4 @@ xIECIN	jsr IECIN
 
 #include "common.a65"
 
-#include "upet-fiec-core.a65"
 

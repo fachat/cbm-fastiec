@@ -1,15 +1,9 @@
 
 /*
- * this file installs the dosrom driver in bank 7 and patches the BASIC 4 ROM
- * to include the ROM usb companion functions.
- *
- * Therefore, at the end of this file, a page of companion code is expected that is
- * installed into $dfxx in BASIC ROM.
- * After that, up to 16k of USB driver code and data are expected, that are copied
- * to $1000 in bank 7 (where the USB driver code resides)
  */
 
-DEV	=9
+
+DEV	=10
 
 	.word $0401
 	*=$0401
@@ -20,9 +14,12 @@ DEV	=9
 eol	.word 0			; BASIC link pointer, 0 means end of code
 	.dsb 1040-*
 
+	jmp start
+
+#include CORE
+
 start
 inc $8000+39
-	jsr fiec_init
 
 	.(
 	lda #0
@@ -37,8 +34,6 @@ inc $8000+38
 
 	lda STATUS
 	jsr hexout
-	lda BURST_FLG
-	jsr hexout
 	
 	lda #"S"
 	jsr $ffd2
@@ -50,16 +45,12 @@ inc $8000+36
 
 	lda STATUS
 	jsr hexout
-	lda BURST_FLG
-	jsr hexout
 	jsr spout
 
 	lda #"I"
 	jsr IECOUT
 
 	lda STATUS
-	jsr hexout
-	lda BURST_FLG
 	jsr hexout
 	jsr cout
 
@@ -69,8 +60,6 @@ inc $8000+36
 	; note: this shows the status of sending "I",
 	; as "I" was only buffered in the first call
 	lda STATUS
-	jsr hexout
-	lda BURST_FLG
 	jsr hexout
 
 	lda #"U"
@@ -83,12 +72,10 @@ inc $8000+36
 	; to send the last byte and then the SECLISTEN under ATN
 	lda STATUS
 	jsr hexout
-	lda BURST_FLG
-	jsr hexout
 	jsr crout
 	rts
 	.)
 
+
 #include "common.a65"
 
-#include "upet-fiec-core.a65"
