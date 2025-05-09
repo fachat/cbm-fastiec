@@ -1,0 +1,82 @@
+
+/*
+ * this file installs the dosrom driver in bank 7 and patches the BASIC 4 ROM
+ * to include the ROM usb companion functions.
+ *
+ * Therefore, at the end of this file, a page of companion code is expected that is
+ * installed into $dfxx in BASIC ROM.
+ * After that, up to 16k of USB driver code and data are expected, that are copied
+ * to $1000 in bank 7 (where the USB driver code resides)
+ */
+
+SDC_COMPANION	=$fe30
+
+	.word $0401
+	*=$0401
+
+	.word eol		; BASIC link pointer
+	.word 10		; line number
+	.byt $9e, "1040", 0	; BASIC code (tokenized)
+eol	.word 0			; BASIC link pointer, 0 means end of code
+	.dsb 1040-*
+
+	; start after sys
+	sei
+
+	; native mode
+	clc
+	xce
+	; 16bit index registers
+	rep #%00010000
+	.xl
+	
+	ldx #end - dosrom
+pc2	lda dosrom-1,x
+	sta $074000-1,x
+	dex
+	bne pc2
+
+	ldx #dosrom - MOVE
+pc3	lda MOVE-1,x
+	sta $9000-1,x
+	dex
+	bne pc3
+	
+	; 8bit index registers
+	sep #%00010000
+	.xs
+
+	; install the patch (in dosromcomp.a65)
+	jsr sdcard_install
+
+	; emulation mode
+	sec
+	xce
+
+	cli
+
+	ldy #0
+tl	lda text,y
+	beq tend
+	jsr $ffd2
+	iny
+	bne tl
+tend	rts
+text
+	.asc 13,"INSTALLATION SUCCESSFUL",13, 0	
+
+STATUS	=$96
+
+MOVE:
+	*=$9000
+
+#include "dosromcomp.a65"
+
+	*=*-$9000+MOVE
+
+dosrom
+	*=$4000
+#define	PET
+	.include "upet-fiec-core.a65"
+	*=*-$4000+dosrom
+end

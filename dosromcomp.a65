@@ -1,0 +1,343 @@
+
+; --------------------------------------------------------
+; This installs the patches to link the CMDR-DOS into the
+; PET BASIC 4 ROM. It requires that the DOS "rom.bin" is
+; loaded into the bank 7 (14 as value for $e802) at $4000.
+; Also, it must run in the upper half of bank 0, as it
+; switches the lower half to bank 7, to run the dos_init.
+; 
+; It also requires the value of "SDC_COMPANION" to be set
+; to the place in the ROM where to copy the link code.
+
+.(
+
+; address of the DOS in DOSBANK
+DOS	=$4000
+
+; DOS jumptable
+dos_seclstn	=DOS + 3 * 0
+dos_sectlk	=DOS + 3 * 1
+dos_iecin	=DOS + 3 * 2
+dos_iecout	=DOS + 3 * 3
+dos_untlk	=DOS + 3 * 4	; note: currently no-op
+dos_unlsn	=DOS + 3 * 5
+dos_listn	=DOS + 3 * 6
+dos_talk	=DOS + 3 * 7	; note: currently same as listn
+
+dos_init	=DOS + 3 * 8
+
+; banking
+
+#ifldef BANK
+.assert BANK == $e802, "BANK register incorrectly defined"
+#else
+BANK		=$e802
+#endif
+
+
+DOSBANK		=14	; DOS runs in memory mapped from $070000-$077fff
+BASBANK		=0	; BASIC runs in bank 0
+
+; variables in BASIC address space
+
+flags		=$03fe	; for testing for now
+
+curdev		=$d4	; current device (unit) number
+cursec		=$d3	; current secondary address
+
+status		=$96	; IEEE status
+
+; DOS bank vars
+
+dos_status	=STATUS	; IEC status
+
+; constants (flags) - checked for with BVx/BPL/BMI
+
+DOS_TALK	=$80
+DOS_LISTEN	=$40
+
+; install the patch and binding
+	
+&sdcard_install .(
+	lda #%01100000
+	sta $e801	; make ROM writable
+
+        ; 16bit index registers
+        rep #%00010000
+        .xl
+
+	; copy over the patch into ROM
+	ldx #rompatch_end - rompatch_start
+l0	lda PATCH-1,x
+	sta SDC_COMPANION-1,x
+	dex
+	bne l0
+
+	; 8 bit registers
+	sep #%00010000
+	.xs
+
+	lda #$4c	; JMP
+	ldx #<talk_listn_unlstn
+	ldy #>talk_listn_unlstn
+	sta $f0d8	; note this is called for TALK, LISTEN and UNLISTEN
+	stx $f0d9	; with either $20, $40, or $3F in A (and PHA'd)
+	sty $f0da
+
+	ldx #<seclstn
+	ldy #>seclstn
+	sta $f145
+	stx $f146
+	sty $f147
+
+	ldx #<untlk
+	ldy #>untlk
+	sta $f1ae
+	stx $f1af
+	sty $f1b0
+
+	ldx #<iecin
+	ldy #>iecin
+	sta $f1c2
+	stx $f1c3
+	sty $f1c4
+
+	ldx #<sectlk
+	ldy #>sectlk
+	sta $f195
+	stx $f196
+	sty $f197
+
+	ldx #<iecout
+	ldy #>iecout
+	sta $f19e
+	stx $f19f
+	sty $f1a0
+	lda #$ea	; NOP
+	sta $f1a1
+
+	lda #%11100000
+	sta $e801	; write protect ROM
+
+	; init the DOS
+
+	php
+	sei
+	lda #DOSBANK
+	sta BANK
+	jsr dos_init
+	lda #BASBANK
+	sta BANK
+	plp
+	rts
+	.)
+
+	; -------------------------------------------------------
+	; the following code is copied into the ROM and called
+	; from the patches into the IEEE code
+
+PATCH:
+	; assemble for ROM address
+
+	*=SDC_COMPANION
+rompatch_start:
+
+	; AC is free. It needs to be #$40 when going back
+talk_listn_unlstn .(
+	cmp #$3f
+	beq unlisten
+
+	php
+	phx
+	sei
+	ora curdev
+
+	; check whether we should use IEEE or IEC
+	tax
+	lda curdev
+	cmp #9
+	bcc no_devx	; original IEEE
+	cmp #11
+	bcs no_devx	; 9 and 10 are IEC
+ 	txa
+
+	asl
+	bmi do_talk
+	txa
+	ldx #DOSBANK
+	stx BANK
+	jsr dos_listn
+	bra endlsn
+
+do_talk	txa
+	ldx #DOSBANK
+	stx BANK
+	jsr dos_talk	; note: DOS currently has same code for talk && listen 
+endlsn
+	lda dos_status
+	cmp #1		; set C-flag
+	ldx #BASBANK
+	stx BANK
+	tsx
+
+	lda flags
+	and #%00111111
+	bcs no_dev
+	; move the IEEE TALK/LISTEN commands into right bits for flags
+	.assert DOS_LISTEN == $40, "check on flag"
+	.assert DOS_TALK == $80, "check on flag"
+	lsr		; keep C for bit 0 ...
+	ora $0103,x 	; $40 for talk, $20 for listen
+	rol		; ... restore bit 0
+	sta flags
+	plx
+	plp
+	pla		; pop TALK/LISTEN flag saved by ROM 
+	clc
+	rts
+
+no_devx	lda #0
+no_dev	sta flags
+	plx
+	plp
+orig_unlsn
+	lda $e840
+	jmp $f0db
+
+unlisten
+	.assert DOS_LISTEN == $40, "check on flag"
+	bit flags
+	bvc orig_unlsn
+	php
+	sei
+	lda #DOSBANK
+	sta BANK
+	jsr dos_unlsn
+	lda #BASBANK
+	sta BANK
+	plp
+	pla
+	rts
+	.)
+
+sectlk	.(
+	.assert DOS_TALK == $80, "check on flag"
+	bit flags
+	bpl not_dos
+&fix_sectalk
+	phx
+	php
+	sei
+	ldx #DOSBANK
+	stx BANK
+	jsr dos_sectlk
+	ldx #BASBANK
+	stx BANK
+	plp
+	plx
+	rts
+not_dos
+	jsr $f109
+	jmp $f198	
+	.)
+
+iecout	.(
+	.assert DOS_LISTEN == $40, "check on flag"
+	bit flags
+	bvc not_dos
+	phx
+	php
+	sei
+	ldx #DOSBANK
+	stx BANK
+	jsr dos_iecout
+	lda dos_status
+	ldx #BASBANK
+	stx BANK
+	ora status
+	sta status
+	plp
+	plx
+	rts
+not_dos
+	bit $a0
+	bmi l1
+	jmp $f1a2
+l1	jmp $f1a6
+	.)
+
+untlk	.(
+	.assert DOS_TALK == $80, "check on flag"
+	bit flags
+	bpl not_dos
+        php
+        sei
+        lda #DOSBANK
+        sta BANK
+        jsr dos_untlk
+        lda #BASBANK
+        sta BANK
+        plp
+	rts
+not_dos	
+	lda $e840
+	jmp $f1b1	
+	rts
+	.)
+
+seclstn	.(
+	.assert DOS_LISTEN == $40, "check on flag"
+	bit flags
+	bmi fix_sectalk		; catch buggy softare calling seclisten instead of sectalk
+	bvc not_dos
+	phx
+	php
+	sei
+	ldx #DOSBANK
+	stx BANK
+	jsr dos_seclstn
+	ldx #BASBANK
+	stx BANK
+	plp
+	plx
+	rts
+
+not_dos	jsr $f109
+	jmp $f148
+	.)
+
+iecin	.(
+	.assert DOS_TALK == $80, "check on flag"
+	bit flags
+	bpl not_dos
+	php
+	phx
+	phy
+	sei
+	ldx #DOSBANK
+	stx BANK
+	jsr dos_iecin
+	tay
+	lda dos_status
+	ldx #BASBANK
+	stx BANK
+	ora status
+	sta status
+	tya
+	ply
+	plx
+	plp
+	rts
+not_dos
+	sta $e821
+	jmp $f1c5
+	.)
+
+
+rompatch_end:
+
+	; fix up PC	
+	*=PATCH + (rompatch_end - rompatch_start)
+
+.)
+
