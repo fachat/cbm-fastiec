@@ -31,4 +31,5 @@ $(ESRFILES): esr%: iec%.a65 cbm-core.a65 common.a65
 clean:
 	rm -f *.bin *.lst
 	rm -f $(DOSFILES) $(CBMFILES) $(ESRFILES)
+	rm -f $(SUPPORT)
 
