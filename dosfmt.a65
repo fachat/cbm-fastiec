@@ -1,0 +1,59 @@
+
+/*
+ * this file installs the dosrom driver in bank 7 and patches the BASIC 4 ROM
+ * to include the ROM usb companion functions.
+ *
+ * Therefore, at the end of this file, a page of companion code is expected that is
+ * installed into $dfxx in BASIC ROM.
+ * After that, up to 16k of USB driver code and data are expected, that are copied
+ * to $1000 in bank 7 (where the USB driver code resides)
+ */
+
+DEV	=9
+
+	.word $0401
+	*=$0401
+
+	.word eol		; BASIC link pointer
+	.word 10		; line number
+	.byt $9e, "1040", 0	; BASIC code (tokenized)
+eol	.word 0			; BASIC link pointer, 0 means end of code
+	.dsb 1040-*
+
+start
+	jsr fiec_init
+
+	jsr send_cmd
+
+	jsr read_st
+
+	rts
+
+send_cmd
+	.(
+	lda #0
+	sta STATUS
+
+	lda #DEV
+	jsr LISTEN
+
+	lda #15+$60
+	jsr SECLISTEN
+
+	ldy #0
+l	lda cmd,y
+	beq le
+	jsr IECOUT
+	iny
+	bne l
+le
+	jsr UNLISTEN
+	rts
+
+cmd	.asc "N0:TEST,22",0
+
+	.)
+
+#include "common.a65"
+
+#include "upet-fiec-core.a65"

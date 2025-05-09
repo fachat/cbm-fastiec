@@ -1,0 +1,18 @@
+= cbm-fastiec
+
+This repository holds code to implement standard and fast serial IEC 
+as used in the Commodore C128, using not a CIA but a VIA shift register.
+
+== Types of programs
+
+
+== Supported Platforms
+
+Currently only those targets are supported:
+
+Ulti-PET::
+	using the VIA SR for receiving and sending
+Ultra-CPU + Ultra-BUS + CS/A IECUART board::
+	either using the VIA SR or an external hardware shift register for receiving
+
+

@@ -1,0 +1,76 @@
+
+/*
+ * 
+ */
+
+DEV	=9
+
+	.word $0401
+	*=$0401
+
+	.word eol		; BASIC link pointer
+	.word 10		; line number
+	.byt $9e, "1040", 0	; BASIC code (tokenized)
+eol	.word 0			; BASIC link pointer, 0 means end of code
+	.dsb 1040-*
+
+start
+inc $8000+39
+	jsr fiec_init
+
+	.(
+	lda #0
+	sta STATUS
+
+	lda #"T"
+	jsr $ffd2
+
+inc $8000+38
+	lda #DEV
+	jsr TALK
+
+	lda STATUS
+	jsr hexout
+	lda #"S"
+	jsr $ffd2
+
+inc $8000+37
+	lda #15+$60
+	jsr SECTALK
+inc $8000+36
+
+	lda STATUS
+	jsr hexout
+in
+	jsr IECIN
+	pha
+	jsr hexout
+	jsr spout
+
+	pla
+	cmp #$20
+	bcc noprint
+	cmp #$80
+	bcc print
+	cmp #$a0
+	bcs print
+noprint	lda #"."
+print	jsr $ffd2
+	
+	jsr spout
+
+	lda STATUS
+	jsr hexout
+	jsr crout
+
+	lda STATUS
+	beq in
+
+	jsr UNTALK
+	rts
+	.)
+
+#include "common.a65"
+
+#include "upet-fiec-esr-core.a65"
+end

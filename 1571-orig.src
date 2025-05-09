@@ -1,0 +1,1522 @@
+
+; from: http://cbmrom.trikaliotis.net/full/floppyrom.a65.full.html
+
+   426:  DRVTRK          := $0022
+
+   434:  BITCNT          := $0037
+
+   464:  AF              := $005F
+
+   483:  LSNADR          := $0077
+   484:  TLKADR          := $0078
+   485:  LSNACT          := $0079
+   486:  TLKACT          := $007A
+
+   488:  ATNPND          := $007C                ; 0 if there is no ATN pending, 1 if it is. This is used to tell the main loop that the IEC/IEEE bus must be processed.
+   489:  ATNMOD          := $007D
+
+   494:  LINDX           := $0082
+
+   495:  SA              := $0083
+   496:  ORGSA           := $0084
+   497:  DATA            := $0085
+
+   511:  CONT            := $0098
+
+   537:  CHNRDY          := $00F2
+   538:  EIOFLG          := $00F8
+
+   577:  L023E           := $023E
+
+   584:  CMD             := $024D
+
+   662:  VIA_O_PB        :=  0
+   663:  VIA_O_PA        :=  1
+   664:  VIA_O_DDRB      :=  2
+   665:  VIA_O_DDRA      :=  3
+   666:  VIA_O_T1CL      :=  4
+   667:  VIA_O_T1CH      :=  5
+   668:  VIA_O_T1CLL     :=  6
+   669:  VIA_O_T1CHL     :=  7
+   670:  VIA_O_T2CL      :=  8
+   671:  VIA_O_T2CH      :=  9
+   672:  VIA_O_SR        := 10
+   673:  VIA_O_ACR       := 11
+   674:  VIA_O_PCR       := 12
+   675:  VIA_O_IFR       := 13
+   676:  VIA_O_IEC       := 14
+   677:  VIA_O_PA_NO_HS  := 15
+   678:  
+   679:  VIA_IFR_B_CA2           := $01 ; cleared by read or write to PA
+   680:  VIA_IFR_B_CA1           := $02 ; cleared by read or write to PA
+   681:  VIA_IFR_B_SR            := $04 ; cleared by read or write to SR
+   682:  VIA_IFR_B_CB2           := $08 ; cleared by read or write to PB
+   683:  VIA_IFR_B_CB1           := $10 ; cleared by read or write to PB
+   684:  VIA_IFR_B_T2            := $20 ; cleared by read T2L or write T2H
+   685:  VIA_IFR_B_T1            := $40 ; cleared by read T1L or write T1H
+   686:  VIA_IFR_B_ANY           := $80 ; cleared if all interrupts are cleared
+   687:  
+   688:  VIA_IER_B_CA2           := VIA_IFR_B_CA2
+   689:  VIA_IER_B_CA1           := VIA_IFR_B_CA1
+   690:  VIA_IER_B_SR            := VIA_IFR_B_SR
+   691:  VIA_IER_B_CB2           := VIA_IFR_B_CB2
+   692:  VIA_IER_B_CB1           := VIA_IFR_B_CB1
+   693:  VIA_IER_B_T2            := VIA_IFR_B_T2
+   694:  VIA_IER_B_T1            := VIA_IFR_B_T1
+   695:  VIA_IER_BW_SET          := $80
+   696:  VIA_IER_BW_UNSET        := $00
+   697:  
+   698:  VIA_PCR_B_CA1_INPUT_POS_EDGE            := $01          ; 1 = input on positive edge, 0 = input on negative edge
+   699:  VIA_PCR_B_CA2_MASK                      := $0E
+   700:  VIA_PCR_B_CA2_INPUT_NEG_CLEAR_ON_READ   := $00
+   701:  VIA_PCR_B_CA2_INPUT_NEG                 := $02
+   702:  VIA_PCR_B_CA2_INPUT_POS_CLEAR_ON_READ   := $04
+   703:  VIA_PCR_B_CA2_INPUT_POS                 := $06
+   704:  VIA_PCR_B_CA2_OUTPUT_HANDSHAKE          := $08
+   705:  VIA_PCR_B_CA2_OUTPUT_PULSE              := $0A
+   706:  VIA_PCR_B_CA2_OUTPUT_LOW                := $0C
+   707:  VIA_PCR_B_CA2_OUTPUT_HIGH               := $0E
+   708:  VIA_PCR_B_CB1_INPUT_POS_EDGE            := $10          ; 1 = input on positive edge, 0 = input on negative edge
+   709:  VIA_PCR_B_CB2_MASK                      := $E0
+   710:  VIA_PCR_B_CB2_INPUT_NEG_CLEAR_ON_READ   := $00
+   711:  VIA_PCR_B_CB2_INPUT_NEG                 := $20
+   712:  VIA_PCR_B_CB2_INPUT_POS_CLEAR_ON_READ   := $40
+   713:  VIA_PCR_B_CB2_INPUT_POS                 := $60
+   714:  VIA_PCR_B_CB2_OUTPUT_HANDSHAKE          := $80
+   715:  VIA_PCR_B_CB2_OUTPUT_PULSE              := $A0
+   716:  VIA_PCR_B_CB2_OUTPUT_LOW                := $C0
+   717:  VIA_PCR_B_CB2_OUTPUT_HIGH               := $E0
+   718:  
+   719:  VIA_ACR_B_PA_LATCH_ENABLE               := $01
+   720:  VIA_ACR_B_PB_LATCH_ENABLE               := $02
+   721:  VIA_ACR_B_SHIFT_MASK                    := $1C
+   722:  VIA_ACR_B_SHIFT_DISABLED                := $00
+   723:  VIA_ACR_B_SHIFT_IN_T2                   := $04
+   724:  VIA_ACR_B_SHIFT_IN_PHI2                 := $08
+   725:  VIA_ACR_B_SHIFT_IN_EXTCLOCK_CB1         := $0C
+   726:  VIA_ACR_B_SHIFT_FREERUNNING_T2          := $10
+   727:  VIA_ACR_B_SHIFT_OUT_T2                  := $14
+   728:  VIA_ACR_B_SHIFT_OUT_PHI2                := $18
+   729:  VIA_ACR_B_SHIFT_OUT_EXTCLOCK_CB1        := $1C
+   730:  VIA_ACR_B_T2_CONTROL_PB6                := $20
+   731:  VIA_ACR_B_T1_CONTROL_MASK               := $C0
+   732:  VIA_ACR_B_T1_CONTROL_ONESHOT            := $00
+   733:  VIA_ACR_B_T1_CONTROL_FREERUN            := $40
+   734:  VIA_ACR_B_T1_CONTROL_ONESHOT_PB7        := $80
+   735:  VIA_ACR_B_T1_CONTROL_FREERUN_PB7        := $C0
+   736:  
+   737:  ; Alternative:
+   738:  VIA_ACR_B_T1_CONTROL_ONETIME            := $40
+   739:  VIA_ACR_B_T1_CONTROL_PB7_OUTPUT         := $80
+
+   742:  VBC_PB1         := VBC + VIA_O_PB
+   743:  
+   744:  .if CompileDrive >= DRIVE_1540
+   745:  
+   746:  VBC_PA1_01            := $01
+   747:  VBC_PA1_02            := $02
+   748:  VBC_PA1_04            := $04
+   749:  VBC_PA1_20            := $20
+   750:  VBC_PA1_80            := $80
+   751:  
+   752:  VBC_PB1_1540_DATAIN    := $01 ; DATA IN
+   753:  VBC_PB1_1540_DATAOUT   := $02 ; DATA OUT
+   754:  VBC_PB1_1540_CLOCKIN   := $04 ; CLOCK IN
+   755:  VBC_PB1_1540_CLOCKOUT  := $08 ; CLOCK OUT
+   756:  VBC_PB1_1540_ATNA      := $10 ; ATNA (if ATNA XOR ATNIN == 1 --> assert DATA, regardless of DATA IN. In this case, DATA OUT is 1 if read)
+   757:  VBC_PB1_1540_DEVICENO0 := $20 ; hardware device no., bit 0
+   758:  VBC_PB1_1540_DEVICENO1 := $40 ; hardware device no., bit 1
+   759:  VBC_PB1_1540_ATNIN     := $80 ; ATN IN (also to CB2 - according to schematic: CA1, NOT CB2!)
+
+
+   741:  VBC             := $1800
+
+   783:  VBC_PA1         := VBC + VIA_O_PA       ; unused on the (original) 1541; parallel input/output on 2031
+   784:  VBC_DDRB1       := VBC + VIA_O_DDRB
+   785:  VBC_DDRA1       := VBC + VIA_O_DDRA
+   786:  VBC_T1LC1       := VBC + VIA_O_T1CL
+   787:  VBC_T1HC1       := VBC + VIA_O_T1CH
+   788:  VBC_T1LL1       := VBC + VIA_O_T1CLL
+   789:  VBC_T1HL1       := VBC + VIA_O_T1CHL
+   790:  VBC_T2LC1       := VBC + VIA_O_T2CL
+   791:  VBC_T2HC1       := VBC + VIA_O_T2CH
+   792:  VBC_SR1         := VBC + VIA_O_SR
+   793:  VBC_ACR1        := VBC + VIA_O_ACR
+   794:  VBC_PCR1        := VBC + VIA_O_PCR
+   795:  VBC_IFR1        := VBC + VIA_O_IFR
+   796:  VBC_IER1        := VBC + VIA_O_IEC
+   797:  VBC_PAUNBUF1    := VBC + VIA_O_PA_NO_HS
+
+
+   852:  CIA_O_PA       :=  0
+   853:  CIA_O_PB       :=  1
+   854:  CIA_O_DDRA     :=  2
+   855:  CIA_O_DDRB     :=  3
+   856:  CIA_O_TALO     :=  4
+   857:  CIA_O_TAHI     :=  5
+   858:  CIA_O_TBLO     :=  6
+   859:  CIA_O_TBHI     :=  7
+   860:  CIA_O_TOD10THS :=  8
+   861:  CIA_O_TODSEC   :=  9
+   862:  CIA_O_TODMIN   := 10
+   863:  CIA_O_TODHR    := 11
+   864:  CIA_O_SDR      := 12
+   865:  CIA_O_ICR      := 13
+   866:  CIA_O_CRA      := 14
+   867:  CIA_O_CRB      := 15
+   868:  
+   869:  CIA_ICR_B_TA            := $01  ; bit: timer A underflow
+   870:  CIA_ICR_B_TB            := $02  ; bit: timer B underflow
+   871:  CIA_ICR_B_TOD           := $04  ; bit: TOD alarm
+   872:  CIA_ICR_B_SP            := $08  ; bit: Serial port full/empty
+   873:  CIA_ICR_B_FLAG          := $10  ; bit: external -FLAG
+   874:  CIA_ICR_B_UNUSED        := $60
+   875:  CIA_ICR_BR_IR           := $80  ; bit: any interrupt occurred (read-only)
+   876:  CIA_ICR_BW_SET          := $80  ; bit: set (=1) or clear (=0) bit (write-only)
+   877:  CIA_ICR_BW_UNSET        := $00  ;
+   878:  
+   879:  CIA_CRA_B_START         := $01  ; 1 = start timer A, 0 = stop timer A
+   880:  CIA_CRA_B_PBON          := $02  ; 1 = timer A output appears on PB6, 0 = PB6 is not affected by timer
+   881:  CIA_CRA_B_TOGGLE        := $04  ; PB6 output mode: 1 = toggle, 0 = pulse
+   882:  CIA_CRA_B_ONESHOT       := $08  ; 1 = one shot timer, 0 = continuous mode
+   883:  CIA_CRA_B_FORCE_LOAD    := $10  ; 1 = force load (this is a strobe, that is, it will always be read as "0")
+   884:  CIA_CRA_B_COUNT_CNT     := $20  ; 1 = timer A counts positive edges of CNT, 0 = timer A counts PHI2 pulses
+   885:  CIA_CRA_B_SP_OUTPUT     := $40  ; 1 = serial port (SP) is output, 0 = it is input
+   886:  CIA_CRA_B_50HZ          := $80  ; 1 = 50Hz clock at TOD, 0 = 60Hz clock
+   887:  
+   888:  CIA_CRB_B_START         := $01  ; 1 = start timer B, 0 = stop timer B
+   889:  CIA_CRB_B_PBON          := $02  ; 1 = timer B output appears on PB7, 0 = PB7 is not affected by timer
+   890:  CIA_CRB_B_TOGGLE        := $04  ; PB7 output mode: 1 = toggle, 0 = pulse
+   891:  CIA_CRB_B_ONESHOT       := $08  ; 1 = one shot timer, 0 = continuous mode
+   892:  CIA_CRB_B_FORCE_LOAD    := $10  ; 1 = force load (this is a strobe, that is, it will always be read as "0")
+   893:  CIA_CRB_B_TOD_ALARM     := $80  ; 1 = writing to TOD registers sets ALARM, 0 = writing to TOD registers sets time-of-day
+   894:  
+   895:  CIA_CRB_B_MODE_MASK     := $60  ; mask bits for setting the timer B count mode
+   896:  CIA_CRB_B_MODE_PHI2     := $00  ; timer B counts PHI2 pulses
+   897:  CIA_CRB_B_MODE_CNT      := $20  ; timer B counts positive edges of CNT
+   898:  CIA_CRB_B_MODE_TA_      := $40  ; timer B counts timer A underflows
+   899:  CIA_CRB_B_MODE_TA_WITH_CNT      := $60  ; timer B counts timer A underflows which occur while CNT is high
+   900:  
+   901:  CIA             := $4000
+   902:  CIA_TALO        := CIA + CIA_O_TALO
+   903:  CIA_TAHI        := CIA + CIA_O_TAHI
+   904:  CIA_SDR         := CIA + CIA_O_SDR
+   905:  CIA_ICR         := CIA + CIA_O_ICR
+   906:  CIA_CRA         := CIA + CIA_O_CRA
+   907:  CIA_CRB         := CIA + CIA_O_CRB
+
+
+
+DRIVE_UNKNOWN=0
+
+   157:  DRIVE_2031=DRIVE_UNKNOWN + $10
+   158:  DRIVE_2031_01=DRIVE_2031 + 1
+   159:  
+   160:  DRIVE_1540=DRIVE_2031 + $10
+   161:  DRIVE_1540_01=DRIVE_1540 + 1
+   162:  
+   163:  DRIVE_1541=DRIVE_1540 + $10
+   164:  DRIVE_1541_01=DRIVE_1541 + 1
+   165:  DRIVE_1541_02=DRIVE_1541 + 2
+   166:  DRIVE_1541_03=DRIVE_1541 + 3
+   167:  DRIVE_1541_05=DRIVE_1541 + 5
+   168:  DRIVE_1541_06AA=DRIVE_1541 + 6
+   169:  
+   170:  DRIVE_1541C=DRIVE_1541 + $10
+   171:  DRIVE_1541C_01=DRIVE_1541C + 1
+   172:  DRIVE_1541C_02=DRIVE_1541C + 2
+   173:  DRIVE_1541C_03=DRIVE_1541C + 3
+   174:  
+   175:  DRIVE_1570=DRIVE_1541C + $10
+   176:  DRIVE_1570_01=DRIVE_1570 + 1
+   177:  
+   178:  DRIVE_1571=DRIVE_1570 + $10
+   179:  DRIVE_1571_03=DRIVE_1571 + 3
+   180:  DRIVE_1571_05=DRIVE_1571 + 5
+   181:  
+   182:  DRIVE_1571CR=DRIVE_1571 + $10
+   183:  DRIVE_1571CR_01=DRIVE_1571CR + 1
+
+CompileDrive = DRIVE_1571_05
+
+  1125:  L80CE:
+  1126:          sei                                     ; disallow interrupts --> blocking job loop
+  1127:          lda     #$00
+  1128:          sta     ATNPND
+  1129:          sta     LSNACT
+  1130:          sta     TLKACT
+  1131:          ldx     #$45
+  1132:          txs
+  1133:          jsr     L81B2
+  1134:          lda     #$80
+  1135:          sta     EIOFLG
+  1136:          sta     ATNMOD
+  1137:          jsr     ClearClockOut
+  1138:          jsr     SetDataOut
+  1139:          lda     VBC_PB1
+  1140:          ora     #VBC_PB1_1540_ATNA
+  1141:          sta     VBC_PB1
+  1142:  L80F1:
+  1143:          lda     VBC_PB1
+  1144:          bpl     L815A
+  1145:          and     #VBC_PB1_1540_CLOCKIN
+  1146:          bne     L80F1
+  1147:  L80FA:
+  1148:          jsr     L82CA
+  1149:          cmp     #$3F
+  1150:          bne     L810D
+  1151:          lda     BITCNT
+  1152:          and     #$BF
+  1153:          sta     BITCNT
+  1154:          lda     #$00
+  1155:          sta     LSNACT
+  1156:          beq     L811B
+  1157:  L810D:
+  1158:          cmp     #$5F
+  1159:          bne     L811E
+  1160:          lda     BITCNT
+  1161:          and     #$BF
+  1162:          sta     BITCNT
+  1163:          lda     #$00
+  1164:          sta     TLKACT
+  1165:  L811B:
+  1166:          jmp     L8192
+  1167:  L811E:
+  1168:          cmp     TLKADR
+  1169:          bne     L812C
+  1170:          lda     #$01
+  1171:          sta     TLKACT
+  1172:          lda     #$00
+  1173:          sta     LSNACT
+  1174:          beq     L8155
+  1175:  L812C:
+  1176:          cmp     LSNADR
+  1177:          bne     L813A
+  1178:          lda     #$01
+  1179:          sta     LSNACT
+  1180:          lda     #$00
+  1181:          sta     TLKACT
+  1182:          beq     L8155
+  1183:  L813A:
+  1184:          tax
+  1185:          and     #$60
+  1186:          cmp     #$60
+  1187:          bne     L818D
+  1188:          txa
+  1189:          sta     ORGSA
+  1190:          and     #$0F
+  1191:          sta     SA
+  1192:          lda     ORGSA
+  1193:          and     #$F0
+  1194:          cmp     #$E0
+  1195:          bne     L8192
+  1196:          cli                                     ; allow processing of job loop
+  1197:          jsr     LDAC0
+  1198:          sei                                     ; disallow interrupts --> blocking job loop
+  1199:  L8155:
+  1200:          bit     VBC_PB1
+  1201:          bmi     L80FA
+  1202:  L815A:
+  1203:          lda     #$00
+  1204:          sta     ATNMOD
+  1205:          lda     VBC_PB1
+  1206:          and     # 255- VBC_PB1_1540_ATNA
+  1207:          sta     VBC_PB1
+  1208:          lda     LSNACT
+  1209:          beq     L8177
+  1210:          bit     BITCNT
+  1211:          bvc     L8171
+  1212:          jsr     L8199
+  1213:  L8171:
+  1214:          jsr     L8342
+  1215:          jmp     MainLoopEntry1570
+  1216:  L8177:
+  1217:          lda     TLKACT
+  1218:          beq     L818A
+  1219:          jsr     ClearDataOut
+  1220:          jsr     SetClockOut
+  1221:          jsr     LA483
+  1222:          jsr     L81EA
+  1223:          jsr     LA483
+  1224:  L818A:
+  1225:          jmp     L8366
+  1226:  L818D:
+  1227:          lda     #VBC_PB1_1540_ATNA
+  1228:          sta     VBC_PB1
+  1229:  L8192:
+  1230:          bit     VBC_PB1
+  1231:          bpl     L815A
+  1232:          bmi     L8192
+  1233:  L8199:
+  1234:          jsr     TestATN
+  1235:          jsr     ReadIecBusIn
+  1236:          and     #VBC_PB1_1540_CLOCKIN
+  1237:          bne     L8199
+  1238:          jsr     L81CE
+  1239:          lda     #$00
+  1240:          sta     CIA_SDR
+  1241:          lda     #CIA_ICR_B_SP
+  1242:  L81AD:
+  1243:          bit     CIA_ICR
+  1244:          beq     L81AD
+  1245:  
+  1246:  L81B2:
+  1247:          php
+  1248:          sei                                     ; disallow interrupts --> blocking job loop
+  1249:          lda     CIA_CRA
+  1250:          and     # 255- CIA_CRA_B_SP_OUTPUT
+  1251:          sta     CIA_CRA
+  1252:  
+  1253:          lda     VBC_PAUNBUF1
+  1254:          and     # 255- VBC_PA1_02
+  1255:          sta     VBC_PAUNBUF1
+  1256:  
+#if CompileDrive >= DRIVE_1571_05
+  1258:          lda     #CIA_ICR_BW_SET | CIA_ICR_B_SP
+#else
+  1260:          lda     #CIA_ICR_BW_SET | CIA_ICR_B_TOD
+#endif
+  1262:          sta     CIA_ICR
+  1263:          bit     CIA_ICR
+  1264:          plp
+  1265:          rts
+  1266:  
+  1267:  L81CE:
+  1268:          php
+  1269:          sei                                     ; disallow interrupts --> blocking job loop
+  1270:          lda     VBC_PAUNBUF1
+  1271:          ora     #VBC_PA1_02
+  1272:          sta     VBC_PAUNBUF1
+  1273:          lda     CIA_CRA
+  1274:          ora     #CIA_CRA_B_SP_OUTPUT
+  1275:          sta     CIA_CRA
+  1276:          lda     #CIA_ICR_B_SP
+  1277:          sta     CIA_ICR
+  1278:          bit     CIA_ICR
+  1279:          plp
+  1280:          rts
+  1281:  L81EA:
+  1282:          sei                                     ; disallow interrupts --> blocking job loop
+  1283:          jsr     LD0EB
+  1284:          bcs     L81F6
+  1285:  L81F0:
+  1286:          ldx     LINDX
+  1287:          lda     CHNRDY,x
+  1288:          bmi     L81F7
+  1289:  L81F6:
+  1290:          rts
+  1291:  L81F7:
+  1292:          jsr     TestATN
+  1293:          jsr     ReadIecBusIn
+  1294:          and     #VBC_PB1_1540_DATAIN
+  1295:          php
+  1296:          jsr     ClearClockOut
+  1297:          plp
+  1298:          beq     L8218
+  1299:  L8206:
+  1300:          jsr     TestATN
+  1301:          jsr     ReadIecBusIn
+  1302:          and     #VBC_PB1_1540_DATAIN
+  1303:          bne     L8206
+  1304:          ldx     LINDX
+  1305:          lda     CHNRDY,x
+  1306:          and     #$08
+  1307:          bne     L822C
+  1308:  L8218:
+  1309:          jsr     TestATN
+  1310:          jsr     ReadIecBusIn
+  1311:          and     #VBC_PB1_1540_DATAIN
+  1312:          bne     L8218
+  1313:  L8222:
+  1314:          jsr     TestATN
+  1315:          jsr     ReadIecBusIn
+  1316:          and     #VBC_PB1_1540_DATAIN
+  1317:          beq     L8222
+  1318:  L822C:
+  1319:          jsr     SetClockOut
+  1320:          jsr     TestATN
+  1321:          jsr     ReadIecBusIn
+  1322:          and     #VBC_PB1_1540_DATAIN
+  1323:          bne     L822C
+  1324:          bit     BITCNT
+  1325:          bvc     L8276
+  1326:          lda     VBC_PAUNBUF1
+  1327:          ora     #VBC_PA1_02
+  1328:          sta     VBC_PAUNBUF1
+  1329:          lda     CIA_CRA
+  1330:          ora     #CIA_CRA_B_SP_OUTPUT
+  1331:          sta     CIA_CRA
+  1332:          bit     CIA_ICR
+  1333:          ldx     LINDX
+  1334:          lda     L023E,x
+  1335:          sta     CIA_SDR
+  1336:  L8258:
+  1337:          lda     CIA_ICR
+  1338:          and     #$08
+  1339:          beq     L8258
+  1340:          lda     CIA_CRA
+  1341:          and     # 255- CIA_CRA_B_SP_OUTPUT
+  1342:          sta     CIA_CRA
+  1343:          lda     VBC_PAUNBUF1
+  1344:          and     # 255- VBC_PA1_02
+  1345:          sta     VBC_PAUNBUF1
+#if CompileDrive >= DRIVE_1571_05
+  1347:          lda     #CIA_ICR_BW_SET | CIA_ICR_B_SP
+#else
+  1349:          lda     #CIA_ICR_BW_SET | CIA_ICR_B_TOD
+#endif
+  1351:          sta     CIA_ICR
+  1352:          bne     L82B2
+  1353:  L8276:
+  1354:          lda     #$08
+  1355:          sta     CONT
+  1356:  L827A:
+  1357:          jsr     ReadIecBusIn
+  1358:          and     #VBC_PB1_1540_DATAIN
+  1359:          bne     L82C4
+  1360:  L8281:
+  1361:          ldx     LINDX
+  1362:          lda     L023E,x
+  1363:          ror     
+  1364:          sta     L023E,x
+  1365:          bcs     L8291
+  1366:          jsr     SetDataOut
+  1367:          bne     L8294
+  1368:  L8291:
+  1369:          jsr     ClearDataOut
+  1370:  L8294:
+  1371:          jsr     LA47E
+  1372:          lda     DRVTRK + 1
+#if CompileDrive >= DRIVE_1571_05
+  1374:          bne     L829E
+#else
+  1376:          bne     L8281
+#endif
+  1378:          jsr     LA483
+  1379:  L829E:
+  1380:          jsr     ClearClockOut
+  1381:          jsr     LA47E
+  1382:          lda     DRVTRK + 1
+  1383:          bne     L82AB
+  1384:          jsr     LA483
+  1385:  L82AB:
+  1386:          jsr     LFEFB
+  1387:          dec     CONT
+  1388:          bne     L827A
+  1389:  L82B2:
+  1390:          jsr     TestATN
+  1391:          jsr     ReadIecBusIn
+  1392:          and     #VBC_PB1_1540_DATAIN
+  1393:          beq     L82B2
+  1394:          cli                                     ; allow processing of job loop
+  1395:          jsr     LD3AA
+  1396:          sei                                     ; disallow interrupts --> blocking job loop
+  1397:          jmp     L81F0
+  1398:  L82C4:
+  1399:          jmp     L8362
+  1400:  L82C7:
+  1401:          bit     CIA_ICR
+  1402:  L82CA:
+  1403:          lda     #$08
+  1404:          sta     CONT
+  1405:  L82CE:
+  1406:          jsr     TestATN
+  1407:          jsr     ReadIecBusIn
+  1408:          and     #VBC_PB1_1540_CLOCKIN
+  1409:          bne     L82CE
+  1410:          jsr     ClearDataOut
+  1411:          lda     #$01
+  1412:  L82DD:
+  1413:          bit     VBC_PB1
+  1414:          bne     L82DD
+#if CompileDrive >= DRIVE_1571_05
+  1416:          jsr     LAA76
+#else
+  1418:          sta     VBC_T1HC1
+#endif
+  1420:  L82E5:
+  1421:          jsr     TestATN
+  1422:          lda     VBC_IFR1
+  1423:          and     #$40
+  1424:          bne     L82F8
+  1425:          jsr     ReadIecBusIn
+  1426:          and     #VBC_PB1_1540_CLOCKIN
+  1427:          beq     L82E5
+  1428:          bne     L8311
+  1429:  L82F8:
+  1430:          jsr     SetDataOut
+  1431:          ldx     #$18
+  1432:  L82FD:
+  1433:          dex
+  1434:          bne     L82FD
+  1435:          jsr     ClearDataOut
+  1436:  L8303:
+  1437:          jsr     TestATN
+  1438:          jsr     ReadIecBusIn
+  1439:          and     #VBC_PB1_1540_CLOCKIN
+  1440:          beq     L8303
+  1441:          lda     #$00
+  1442:          sta     EIOFLG
+  1443:  L8311:
+  1444:          lda     VBC_PB1
+  1445:          eor     #VBC_PB1_1540_DATAIN
+  1446:          tax
+  1447:          lda     CIA_ICR
+  1448:          and     #CIA_ICR_B_SP
+  1449:          beq     L8326
+  1450:          lda     CIA_SDR
+  1451:          sta     DATA
+  1452:          jmp     L833C
+  1453:  L8326:
+  1454:          txa
+  1455:          lsr     
+  1456:          and     #$02
+  1457:          bne     L8311
+  1458:          ror     DATA
+  1459:  L832E:
+  1460:          jsr     TestATN
+  1461:          jsr     ReadIecBusIn
+  1462:          and     #VBC_PB1_1540_CLOCKIN
+  1463:          beq     L832E
+  1464:          dec     CONT
+  1465:          bne     L8311
+  1466:  L833C:
+  1467:          jsr     SetDataOut
+  1468:          lda     DATA
+  1469:          rts
+  1470:  L8342:
+  1471:          sei                                     ; disallow interrupts --> blocking job loop
+  1472:          jsr     LD107
+  1473:          bcs     L834D
+  1474:          lda     CHNRDY,x
+  1475:          ror     
+  1476:          bcs     L8358
+  1477:  L834D:
+  1478:          lda     ORGSA
+  1479:          and     #$F0
+  1480:          cmp     #$F0
+  1481:          beq     L8358
+  1482:          jmp     L8366
+  1483:  L8358:
+  1484:          jsr     L82C7
+  1485:          cli                                     ; allow processing of job loop
+  1486:          jsr     LCFB7
+  1487:          jmp     L8342
+  1488:  L8362:
+  1489:          lda     #$00
+  1490:          sta     BITCNT
+  1491:  L8366:
+  1492:          lda     #0
+  1493:          sta     VBC_PB1
+  1494:  MainLoopEntry1570:
+  1495:          jsr     L81B2
+  1496:          jmp     MainLoopEntry
+  1497:  L8371:
+  1498:          sta     CMD
+  1499:          sta     AF
+  1500:          lda     VBC_IFR1
+  1501:          lsr     
+  1502:          bcc     L8394
+  1503:          ldx     #$0B
+  1504:          .byte   ASM_BIT3
+  1505:  L837F:
+  1506:          ldx     #$4F
+  1507:  L8381:
+  1508:          jsr     L85E9
+  1509:  L8384:
+  1510:          jsr     L8581
+  1511:  L8387:
+  1512:          cpx     #$02
+  1513:          bcs     L838C
+  1514:          rts
+  1515:  L838C:
+  1516:          txa
+  1517:          and     #$0F
+  1518:          ldx     #$00
+  1519:          jmp     LE60A
+  1520:  L8394:
+  1521:          jsr     L81CE
+  1522:          bit     AS
+  1523:          bpl     L83A0
+  1524:          lda     #$09
+  1525:          jmp     L86E6
+  1526:  L83A0:
+  1527:          jsr     LC63D
+  1528:  L83A3:
+  1529:          cli                                     ; allow processing of job loop
+  1530:          lda     HINIB
+  1531:          and     #$20
+  1532:          bne     L83D0
+  1533:          lda     CMDBUF + 3
+  1534:          sta     TRACK0
+  1535:          lda     CMDBUF + 4
+  1536:          sta     SECTOR0
+  1537:          ldx     #$00
+  1538:          lda     AF
+  1539:          sta     JOBS0,x
+  1540:          jsr     L865E
+  1541:          sei                                     ; disallow interrupts --> blocking job loop
+  1542:          jsr     L85E9
+  1543:          bit     HINIB
+  1544:          bvs     L83C9
+  1545:          cpx     #$02
+  1546:          bcs     L8381
+  1547:  L83C9:
+  1548:          jsr     L85F9
+  1549:          lda     HINIB
+  1550:          bmi     L83DD
+  1551:  L83D0:
+  1552:          ldy     #$00
+  1553:  L83D2:
+  1554:          lda     BUFFER0,y
+  1555:          sta     CTRACK
+  1556:          jsr     L85F9
+  1557:          iny
+  1558:          bne     L83D2
+  1559:  L83DD:
+  1560:          dec     CMDBUF + 5
+  1561:          beq     L83E8
+  1562:          jsr     L861E
+  1563:          jmp     L83A3
+  1564:  L83E8:
+  1565:          cli                                     ; allow processing of job loop
+  1566:          jmp     L85AF
+  1567:  L83EC:
+  1568:          sta     CMD
+  1569:          lda     VBC_IFR1
+  1570:          lsr     
+  1571:          bcc     L8402
+  1572:          ldx     #$0B
+  1573:          .byte   ASM_BIT3
+  1574:  L83F8:
+  1575:          ldx     #$4F
+  1576:          stx     CTRACK
+  1577:          lda     HINIB
+  1578:          ora     #$08
+  1579:          sta     HINIB
+  1580:  L8402:
+  1581:          bit     AS
+  1582:          bpl     L840B
+  1583:          lda     #$0A
+  1584:          jmp     L86E6
+  1585:  L840B:
+  1586:          jsr     LC63D
+  1587:          lda     HINIB
+  1588:          bmi     L843B
+  1589:  L8412:
+  1590:          sei                                     ; disallow interrupts --> blocking job loop
+  1591:          ldy     #$00
+  1592:  L8415:
+  1593:          lda     VBC_PB1
+  1594:          eor     #VBC_PB1_1540_CLOCKOUT
+  1595:          bit     CIA_ICR
+  1596:          sta     VBC_PB1
+  1597:  L8420:
+  1598:          lda     VBC_PB1
+  1599:          bpl     L8428
+  1600:          jsr     TestATN
+  1601:  L8428:
+  1602:          lda     CIA_ICR
+  1603:          and     #CIA_ICR_B_SP
+  1604:          beq     L8420
+  1605:          lda     CIA_SDR
+  1606:          sta     BUFFER0,y
+  1607:          iny
+  1608:          bne     L8415
+  1609:          jsr     ClearClockOut
+  1610:  L843B:
+  1611:          cli                                     ; allow processing of job loop
+  1612:          lda     HINIB
+  1613:          and     #$20
+  1614:          bne     L8479
+  1615:          lda     HINIB
+  1616:          and     #$08
+  1617:          beq     L844D
+  1618:          ldx     CTRACK
+  1619:          jmp     L8381
+  1620:  L844D:
+  1621:          lda     CMDBUF + 3
+  1622:          sta     TRACK0
+  1623:          lda     CMDBUF + 4
+  1624:          sta     SECTOR0
+  1625:          ldx     #$00
+  1626:          lda     #$90
+  1627:          sta     JOBS0,x
+  1628:          jsr     L865E
+  1629:          sei                                     ; disallow interrupts --> blocking job loop
+  1630:          jsr     L81CE
+  1631:          jsr     L85E9
+  1632:          jsr     L85F9
+  1633:          jsr     L86A0
+  1634:          jsr     L81B2
+  1635:          cli                                     ; allow processing of job loop
+  1636:          bit     HINIB
+  1637:          bvs     L8479
+  1638:          cpx     #$02
+  1639:          bcs     L8484
+  1640:  L8479:
+  1641:          dec     CMDBUF + 5
+  1642:          beq     L8487
+  1643:          jsr     L861E
+  1644:          jmp     L8412
+  1645:  L8484:
+  1646:          jmp     L838C
+  1647:  L8487:
+  1648:          cli                                     ; allow processing of job loop
+  1649:          jmp     L85AF
+  1650:  L848B:
+  1651:          lda     CMDBUF + 2
+  1652:          and     #$01
+  1653:          bne     L84B2
+  1654:          lda     #$01
+  1655:          sta     VBC_IFR1
+  1656:          lda     #$05
+  1657:          jsr     L86E6
+  1658:          ldx     L01B0
+  1659:          cpx     #$02
+  1660:          bcc     L84B4
+  1661:          ldx     #$00
+  1662:          stx     AS
+  1663:          lda     #$B0
+#if CompileDrive >= DRIVE_1571_05
+  1665:          jsr     LC075
+#else
+  1667:          sta     CMD
+#endif
+  1669:          sta     JOBS0,x
+  1670:          jsr     L865E
+  1671:          .byte   ASM_BIT3
+  1672:  L84B2:
+  1673:          ldx     #$4F
+  1674:  L84B4:
+  1675:          jmp     L8381
+  1676:  L84B7:
+  1677:          lda     CMDBUF + 2
+  1678:          and     #$01
+  1679:          bne     L84E9
+  1680:          lda     CMDBUF + 3
+  1681:          bpl     L84C8
+  1682:          lda     #$08
+  1683:          jmp     L86E6
+  1684:  L84C8:
+  1685:          lda     #$00
+  1686:          sta     AS
+  1687:          sta     NODRV
+  1688:          lda     CMDBUF + 4
+  1689:          sta     DiskID0
+  1690:          lda     CMDBUF + 5
+  1691:          sta     DiskID0 + 1
+  1692:          jsr     LD307
+  1693:          lda     #$01
+  1694:          sta     TRACK
+  1695:          lda     #$FF
+  1696:          sta     JOBRTN
+#if CompileDrive = DRIVE_1571_03
+  1698:          jsr     LA989
+#else
+  1700:          jsr     LAA4D
+#endif
+  1702:          tax
+  1703:          .byte   ASM_BIT3
+  1704:  L84E9:
+  1705:          ldx     #$4F
+  1706:          jsr     L85E9
+  1707:          jmp     L8387
+  1708:  L84F1:
+  1709:          sei                                     ; disallow interrupts --> blocking job loop
+  1710:          bit     HINIB
+  1711:          bpl     L8500
+  1712:          jsr     L81CE
+  1713:          lda     BYTE
+  1714:          sta     CTRACK
+  1715:          jmp     L85F9
+  1716:  L8500:
+  1717:          ldx     CMDSIZ
+  1718:          cpx     #$04
+  1719:          bcs     L8511
+  1720:          ldx     #$0E
+  1721:          jsr     L85E9
+  1722:          lda     #ERRORCODE_31_SYNTAX_ERROR
+  1723:          jmp     GenerateErrorMessage
+  1724:          ; --------------
+  1725:  
+  1726:  L8511:
+  1727:          lda     CMDBUF + 3
+  1728:          sta     BYTE
+  1729:          rts
+  1730:  L8517:
+  1731:          jsr     L848B
+  1732:          bit     AS
+  1733:          bpl     L8566
+  1734:          lda     #$0D
+  1735:          jsr     L86E6
+  1736:          ldx     L01B0
+  1737:          cpx     #$02
+  1738:          bcs     L8532
+  1739:          jsr     L8961
+  1740:          jsr     L8986
+  1741:          txa
+  1742:          pha
+  1743:  L8532:
+  1744:          sei                                     ; disallow interrupts --> blocking job loop
+  1745:          jsr     L81CE
+  1746:          lda     AS
+  1747:          sta     CTRACK
+  1748:          jsr     L85F9
+  1749:          ldx     L01B0
+  1750:          cpx     #$02
+  1751:          bcs     L8567
+  1752:          lda     MYPA
+  1753:          sta     CTRACK
+  1754:          jsr     L85F9
+  1755:          lda     NMIFLG
+  1756:          sta     CTRACK
+  1757:          jsr     L85F9
+  1758:          lda     ACLSTP
+  1759:          sta     CTRACK
+  1760:          jsr     L85F9
+  1761:          lda     RSTEPS
+  1762:          sta     CTRACK
+  1763:          jsr     L85F9
+  1764:          pla
+  1765:          sta     CTRACK
+#if CompileDrive >= DRIVE_1571_05
+  1767:          jmp     LAAC5
+#else
+  1769:          jsr     L85F9
+#endif
+  1771:  L8566:
+  1772:          rts
+  1773:  L8567:
+  1774:          pla
+  1775:          jmp     L838C
+  1776:  L856B:
+  1777:          bit     HINIB
+  1778:          bpl     L8596
+  1779:          bit     HINIB
+  1780:          bvc     L8581
+  1781:          lda     VBC_IFR1
+  1782:          lsr     
+  1783:          bcc     L8581
+  1784:          lda     AS
+  1785:          and     #$F0
+  1786:          ora     #$0B
+  1787:          sta     AS
+  1788:  L8581:
+  1789:          sei                                     ; disallow interrupts --> blocking job loop
+  1790:          jsr     L81CE
+  1791:          lda     AS
+  1792:          sta     CTRACK
+  1793:          jsr     L85F9
+  1794:          lda     #ERRORCODE_00_OK
+  1795:          sta     ERWORD
+  1796:          jsr     L81B2
+  1797:          cli                                     ; allow processing of job loop
+  1798:          rts
+  1799:  L8596:
+  1800:          lda     CMDBUF + 3
+  1801:          sta     AS
+  1802:          bit     HINIB
+  1803:          bvc     L85A4
+  1804:          lda     #$01
+  1805:          sta     VBC_IFR1
+  1806:  L85A4:
+  1807:          rts
+  1808:  L85A5:
+  1809:          ldx     #$0E
+  1810:          jsr     L85E9
+  1811:          lda     #ERRORCODE_31_SYNTAX_ERROR
+  1812:          jmp     GenerateErrorMessage
+  1813:          ; --------------
+  1814:  
+  1815:  L85AF:
+  1816:          lda     CMDSIZ
+  1817:          cmp     #$07
+  1818:          bcc     L85E8
+  1819:          lda     TRACK0
+  1820:          tay
+  1821:          sbc     #$01
+  1822:          asl     a
+  1823:          sta     MINSTP
+  1824:          cpy     #$24
+  1825:          php
+  1826:          ldy     CMDBUF + 6
+  1827:          sty     DRVTRK
+  1828:          dey
+  1829:          sty     NMIFLG
+  1830:          cpy     #$23
+  1831:          ror     
+  1832:          plp
+  1833:          and     #$80
+  1834:          bcc     L85DC
+  1835:          bmi     L85E5
+  1836:          clc
+  1837:          lda     NMIFLG
+  1838:          adc     #$23
+  1839:          sta     NMIFLG
+  1840:          bmi     L85E5
+  1841:  L85DC:
+  1842:          bpl     L85E5
+  1843:          sec
+  1844:          lda     NMIFLG
+  1845:          sbc     #$23
+  1846:          sta     NMIFLG
+  1847:  L85E5:
+  1848:          jmp     L87BA
+  1849:  L85E8:
+  1850:          rts
+  1851:  L85E9:
+  1852:          stx     CTRACK
+  1853:          lda     AS
+  1854:          and     #$F0
+  1855:          ora     CTRACK
+  1856:          sta     AS
+  1857:          sta     CTRACK
+  1858:          rts
+  1859:  L85F6:
+  1860:          jsr     TestATN
+  1861:  L85F9:
+  1862:          lda     VBC_PB1
+  1863:          cmp     VBC_PB1
+  1864:          bne     L85F9
+  1865:          and     #$FF
+  1866:          bmi     L85F6
+  1867:          eor     BITCNT
+  1868:          and     #$04    ; VBC_PB1_1540_CLOCKIN?
+  1869:          beq     L85F9
+  1870:          lda     CTRACK
+#if CompileDrive >= DRIVE_1571_05
+  1872:          jmp     LAB10
+#else
+  1874:          sta     CIA_SDR
+#endif
+  1876:          lda     BITCNT
+  1877:          eor     #$04
+  1878:          sta     BITCNT
+  1879:          lda     #CIA_ICR_B_SP
+  1880:  L8618:
+  1881:          bit     CIA_ICR
+  1882:          beq     L8618
+  1883:          rts
+  1884:  
+  1885:  L861E:
+  1886:          lda     CMDBUF + 3
+  1887:          cmp     #$24
+  1888:          bcc     L8627
+  1889:          sbc     #$23
+  1890:  L8627:
+  1891:          tax
+  1892:          lda     L9409 + 34,x
+  1893:          tax
+  1894:          dex
+  1895:          stx     CTRACK
+  1896:          clc
+  1897:          lda     CMDBUF + 4
+  1898:          adc     BYTE
+  1899:          cmp     CTRACK
+  1900:          bcc     L8643
+  1901:          sbc     CTRACK
+  1902:          beq     L8641
+  1903:          sec
+  1904:          sbc     #$01
+  1905:          .byte   ASM_BIT3
+  1906:  L8641:
+  1907:          lda     CTRACK
+  1908:  L8643:
+  1909:          sta     CMDBUF + 4
+  1910:          lda     #$88
+  1911:          sta     AF
+  1912:          rts
+  1913:  L864B:
+  1914:          ldx     JOBNUM
+  1915:          php
+  1916:          cli                                     ; allow processing of job loop
+  1917:          jsr     L9FB6
+  1918:          cmp     #$02
+  1919:          bcc     L865B
+  1920:          jsr     L8683
+  1921:          lda     JOBS0,x
+  1922:  L865B:
+  1923:          tax
+  1924:          plp
+  1925:          rts
+  1926:  L865E:
+  1927:          ldx     #$00
+  1928:          php
+  1929:          sei                                     ; disallow interrupts --> blocking job loop
+  1930:          lda     VDC_PB2
+  1931:          ora     #VDC_PB2_DRIVE0LED
+  1932:          sta     VDC_PB2
+  1933:          cli                                     ; allow processing of job loop
+  1934:          jsr     L9FB6
+  1935:          cmp     #$02
+  1936:          bcc     L8675
+  1937:          jsr     L8683
+  1938:  L8675:
+  1939:          sei                                     ; disallow interrupts --> blocking job loop
+  1940:          lda     VDC_PB2
+  1941:          and     # 255- VDC_PB2_DRIVELEDS
+  1942:          sta     VDC_PB2
+  1943:          lda     JOBS0,x
+  1944:          tax
+  1945:          plp
+  1946:          rts
+  1947:  L8683:
+  1948:          lda     #$FF
+  1949:          sta     JOBRTN
+  1950:          stx     JOBNUM
+  1951:          lda     CMDBUF + 2
+  1952:          sta     AF
+  1953:          sta     CMD
+  1954:          sta     LSTJOB,x
+#if CompileDrive >= DRIVE_1571_05
+  1956:          sta     JOBS0,x
+#else
+  1958:          sta     JOBS0
+#endif
+  1960:          jsr     L9FB6
+  1961:          jmp     LD599
+  1962:  L869D:
+  1963:          jsr     TestATN
+  1964:  L86A0:
+  1965:          lda     VBC_PB1
+  1966:          cmp     VBC_PB1
+  1967:          bne     L86A0
+  1968:          and     #$FF
+  1969:          bmi     L869D
+  1970:          eor     BITCNT
+  1971:          and     #$04    ; VBC_PB1_1540_CLOCKIN?
+  1972:          beq     L86A0
+  1973:          lda     BITCNT
+  1974:          eor     #$04
+  1975:          sta     BITCNT
+  1976:          rts
+  1977:  L86B9:
+
+  6763:  ProcessBus1570:
+#if CompileDrive = DRIVE_1571_03
+  6765:          lda     VBC_PAUNBUF1
+#else
+  6767:          jsr     LAA62
+#endif
+  6769:          and     #VBC_PA1_20
+  6770:          beq     LA7BD
+  6771:          jmp     L80CE
+  6772:  LA7BD:
+  6773:          jmp     ProcessBus
+
+ 14316:  
+ 14317:  ; Set the ATN pending flag to mark that the bus must be processed
+ 14318:  ;
+ 14319:  SetATNPending:
+ 14320:          lda     VBC_PA1
+ 14321:  
+ 14322:          ; set the ATN pending flag to mark that the bus must be processed
+ 14323:  
+ 14324:          lda     #$01
+ 14325:          sta     ATNPND
+ 14326:          rts
+ 14327:  
+ 14328:  
+ 14329:  ; This routine is called after an ATN was issued by the bus controller.
+ 14330:  ; It processes the bus and gets the command from it.
+ 14331:  ;
+ 14332:  ProcessBus:
+ 14333:  
+ 14334:          sei                                     ; disallow interrupts --> blocking job loop
+ 14335:  
+ 14336:          ; clear the ATN pending flag (as we already entered this routine, we do not need it anymore
+ 14337:  
+ 14338:          lda     #$00
+ 14339:          sta     ATNPND
+ 14340:  
+#if CompileDrive >= DRIVE_1540
+ 14342:  
+ 14343:          sta     LSNACT
+ 14344:          sta     TLKACT
+ 14345:  
+#endif
+ 14347:  
+ 14348:          ; set the stack pointer, effectively clearing the stack
+ 14349:          ; (Thus, we will NOT return with an RTS)
+ 14350:          ;
+ 14351:          ldx     #<SP_END                        ; set SP to $0145
+ 14352:          txs
+ 14353:  
+#if CompileDrive >= DRIVE_1540
+ 14355:  
+ 14356:          lda     #$80
+ 14357:          sta     EIOFLG
+ 14358:          sta     ATNMOD
+ 14359:          jsr     ClearClockOut
+ 14360:          jsr     SetDataOut
+ 14361:  
+ 14362:          ; Acknowledge ATN by dropping DATA
+ 14363:          lda     VBC_PB1
+ 14364:          ora     #VBC_PB1_1540_ATNA
+ 14365:          sta     VBC_PB1
+ 14366:  
+ 14367:  @LE87B:
+ 14368:          lda     VBC_PB1
+ 14369:          bpl     LE8D7
+ 14370:          and     #VBC_PB1_1540_CLOCKIN
+ 14371:          bne     @LE87B
+ 14372:  
+ 14373:  @LE884:
+ 14374:          jsr     LE9C9
+ 14375:          cmp     #$3F
+ 14376:          bne     @LE891
+ 14377:          lda     #$00
+ 14378:          sta     LSNACT
+ 14379:          beq     LE902
+ 14380:  @LE891:
+ 14381:          cmp     #$5F
+ 14382:          bne     @LE89B
+ 14383:          lda     #$00
+ 14384:          sta     TLKACT
+ 14385:          beq     LE902
+ 14386:  @LE89B:
+ 14387:          cmp     TLKADR
+ 14388:          bne     @LE8A9
+ 14389:          lda     #$01
+ 14390:          sta     TLKACT
+ 14391:          lda     #$00
+ 14392:          sta     LSNACT
+ 14393:          beq     @LE8D2
+ 14394:  @LE8A9:
+ 14395:          cmp     LSNADR
+ 14396:          bne     @LE8B7
+ 14397:          lda     #$01
+ 14398:          sta     LSNACT
+ 14399:          lda     #$00
+ 14400:          sta     TLKACT
+ 14401:          beq     @LE8D2
+ 14402:  @LE8B7:
+ 14403:          tax
+ 14404:          and     #$60
+ 14405:          cmp     #$60
+ 14406:          bne     LE8FD
+ 14407:          txa
+ 14408:          sta     ORGSA
+ 14409:          and     #$0F
+ 14410:          sta     SA
+ 14411:          lda     ORGSA
+ 14412:          and     #$F0
+ 14413:          cmp     #$E0
+ 14414:          bne     LE902
+ 14415:          cli                                     ; allow processing of job loop
+ 14416:          jsr     LDAC0
+ 14417:          sei                                     ; disallow interrupts --> blocking job loop
+ 14418:  @LE8D2:
+ 14419:          bit     VBC_PB1
+ 14420:          bmi     @LE884
+ 14421:  
+ 14422:  LE8D7:
+ 14423:          lda     #$00
+ 14424:          sta     ATNMOD
+ 14425:          lda     VBC_PB1
+ 14426:          and     # 255- VBC_PB1_1540_ATNA
+ 14427:          sta     VBC_PB1
+ 14428:          lda     LSNACT
+ 14429:          beq     LE8ED
+ 14430:          jsr     LEA2E
+#if CompileDrive >= DRIVE_1570
+ 14432:          jmp     MainLoopEntry1570
+ 14433:          ; --------------------------
+#else
+ 14435:          jmp     MainLoopEntry
+ 14436:          ; --------------------------
+#endif
+ 14438:  
+ 14439:  LE8ED:
+ 14440:          lda     TLKACT
+ 14441:          beq     LE8FA
+ 14442:          jsr     ClearDataOut
+ 14443:          jsr     SetClockOut
+ 14444:          jsr     LE909
+ 14445:  LE8FA:
+ 14446:          jmp     LEA4E
+ 14447:  LE8FD:
+ 14448:          lda     #VBC_PB1_1540_ATNA
+ 14449:          sta     VBC_PB1
+ 14450:  LE902:
+ 14451:          bit     VBC_PB1
+ 14452:          bpl     LE8D7
+ 14453:          bmi     LE902
+ 14454:  LE909:
+ 14455:          sei                                     ; disallow interrupts --> blocking job loop
+ 14456:          jsr     LD0EB
+ 14457:          bcs     LE915
+ 14458:  LE90F:
+ 14459:          ldx     LINDX
+ 14460:          lda     CHNRDY,x
+ 14461:          bmi     LE916
+ 14462:  LE915:
+ 14463:          rts
+ 14464:          ; --------------
+ 14465:  
+ 14466:  LE916:
+ 14467:          jsr     TestATN
+ 14468:          jsr     ReadIecBusIn
+ 14469:          and     #VBC_PB1_1540_DATAIN
+ 14470:          php
+ 14471:          jsr     ClearClockOut
+ 14472:          plp
+ 14473:          beq     @LE937
+ 14474:  
+ 14475:  @LE925:
+ 14476:          jsr     TestATN
+ 14477:          jsr     ReadIecBusIn
+ 14478:          and     #VBC_PB1_1540_DATAIN
+ 14479:          bne     @LE925
+ 14480:          ldx     LINDX
+ 14481:          lda     CHNRDY,x
+ 14482:          and     #$08
+ 14483:          bne     @LE94B
+ 14484:  @LE937:
+ 14485:          jsr     TestATN
+ 14486:          jsr     ReadIecBusIn
+ 14487:          and     #VBC_PB1_1540_DATAIN
+ 14488:          bne     @LE937
+ 14489:  @LE941:
+ 14490:          jsr     TestATN
+ 14491:          jsr     ReadIecBusIn
+ 14492:          and     #VBC_PB1_1540_DATAIN
+ 14493:          beq     @LE941
+ 14494:  @LE94B:
+ 14495:          jsr     SetClockOut
+ 14496:          jsr     TestATN
+ 14497:          jsr     ReadIecBusIn
+ 14498:          and     #VBC_PB1_1540_DATAIN
+ 14499:          bne     @LE94B
+ 14500:          lda     #$08
+ 14501:          sta     CONT
+ 14502:  @LE95C:
+ 14503:          jsr     ReadIecBusIn
+ 14504:          and     #VBC_PB1_1540_DATAIN
+ 14505:          bne     @LE999
+ 14506:          ldx     LINDX
+ 14507:          lda     L023E,x
+ 14508:          ror     
+ 14509:          sta     L023E,x
+ 14510:          bcs     @LE973
+ 14511:          jsr     SetDataOut
+ 14512:          bne     @LE976
+ 14513:  @LE973:
+ 14514:          jsr     ClearDataOut
+ 14515:  @LE976:
+ 14516:          jsr     ClearClockOut
+#if CompileDrive >= DRIVE_1541_01
+ 14518:          lda     DRVTRK + 1
+ 14519:          bne     @LE980
+ 14520:          jsr     LFEF3
+ 14521:  @LE980:
+ 14522:          jsr     LFEFB
+#else
+ 14524:          FillNOP 4
+ 14525:          jsr     SetClockOut
+ 14526:          jsr     ClearDataOut
+#endif
+ 14528:          dec     CONT
+ 14529:          bne     @LE95C
+ 14530:  @LE987:
+ 14531:          jsr     TestATN
+ 14532:          jsr     ReadIecBusIn
+ 14533:          and     #VBC_PB1_1540_DATAIN
+ 14534:          beq     @LE987
+ 14535:          cli                                     ; allow processing of job loop
+ 14536:          jsr     LD3AA
+ 14537:          sei                                     ; disallow interrupts --> blocking job loop
+ 14538:          jmp     LE90F
+ 14539:          ; ---------------------------------
+ 14540:  @LE999:
+ 14541:          jmp     LEA4E
+ 14542:          ; ---------------------------------
+ 14543:  
+ 14544:  ClearDataOut:
+ 14545:          lda     VBC_PB1
+ 14546:          and     # 255- VBC_PB1_1540_DATAOUT
+ 14547:          sta     VBC_PB1
+ 14548:          rts
+ 14549:          ; ---------------------------------
+ 14550:  
+ 14551:  SetDataOut:
+ 14552:          lda     VBC_PB1
+ 14553:          ora     #VBC_PB1_1540_DATAOUT
+ 14554:          sta     VBC_PB1
+ 14555:          rts
+ 14556:          ; ---------------------------------
+ 14557:  
+ 14558:  SetClockOut:
+ 14559:          lda     VBC_PB1
+ 14560:          ora     #VBC_PB1_1540_CLOCKOUT
+ 14561:          sta     VBC_PB1
+ 14562:          rts
+ 14563:          ; ---------------------------------
+ 14564:  
+ 14565:  ClearClockOut:
+ 14566:          lda     VBC_PB1
+ 14567:          and     # 255- VBC_PB1_1540_CLOCKOUT
+ 14568:          sta     VBC_PB1
+ 14569:          rts
+ 14570:          ; ---------------------------------
+ 14571:  
+ 14572:  ReadIecBusIn:
+ 14573:          lda     VBC_PB1
+ 14574:          cmp     VBC_PB1
+ 14575:          bne     ReadIecBusIn
+ 14576:          rts
+ 14577:          ; ---------------------------------
+ 14578:  
+ 14579:  LE9C9:
+ 14580:          lda     #$08
+ 14581:          sta     CONT
+ 14582:  @LE9CD:
+ 14583:          jsr     TestATN
+ 14584:          jsr     ReadIecBusIn
+ 14585:          and     #VBC_PB1_1540_CLOCKIN
+ 14586:          bne     @LE9CD
+ 14587:  
+ 14588:          jsr     ClearDataOut
+ 14589:  
+ 14590:          lda     #>$0100
+#if CompileDrive >= DRIVE_1541_05
+ 14592:          jmp     LFF20
+#else
+ 14594:          sta     VBC_T1HC1
+#endif
+ 14596:  LE9DF:
+ 14597:          jsr     TestATN
+ 14598:          lda     VBC_IFR1
+ 14599:          and     #VIA_IFR_B_T1
+ 14600:          bne     @LE9F2
+ 14601:          jsr     ReadIecBusIn
+ 14602:          and     #VBC_PB1_1540_CLOCKIN
+ 14603:          beq     LE9DF
+ 14604:          bne     @LEA0B
+ 14605:          ; ----------------------
+ 14606:  
+ 14607:  @LE9F2:
+ 14608:          jsr     SetDataOut
+ 14609:          ldx     #$0A
+ 14610:  @LE9F7:
+ 14611:          dex
+ 14612:          bne     @LE9F7
+ 14613:          jsr     ClearDataOut
+ 14614:  @LE9FD:
+ 14615:          jsr     TestATN
+ 14616:          jsr     ReadIecBusIn
+ 14617:          and     #VBC_PB1_1540_CLOCKIN
+ 14618:          beq     @LE9FD
+ 14619:          lda     #$00
+ 14620:          sta     EIOFLG
+ 14621:  @LEA0B:
+ 14622:          lda     VBC_PB1
+#if CompileDrive >= DRIVE_1541_02
+ 14624:          eor     #VBC_PB1_1540_DATAIN
+ 14625:          lsr     
+ 14626:          and     #VBC_PB1_1540_CLOCKIN / 2
+ 14627:          bne     @LEA0B
+ 14628:          FillNOP 3
+#else
+ 14630:          and     #VBC_PB1_1540_CLOCKIN
+ 14631:          bne     @LEA0B
+ 14632:          lda     VBC_PB1
+ 14633:          eor     #VBC_PB1_1540_DATAIN
+ 14634:          lsr     
+#endif
+ 14636:          ror     DATA
+ 14637:  @LEA1A:
+ 14638:          jsr     TestATN
+ 14639:          jsr     ReadIecBusIn
+ 14640:          and     #VBC_PB1_1540_CLOCKIN
+ 14641:          beq     @LEA1A
+ 14642:          dec     CONT
+ 14643:          bne     @LEA0B
+ 14644:          jsr     SetDataOut
+ 14645:          lda     DATA
+ 14646:          rts
+
+ 14684:  TSTATN:
+ 14685:  TestATN:
+ 14686:          lda     ATNMOD
+ 14687:          beq     @LEA63
+ 14688:          lda     VBC_PB1
+ 14689:          bpl     @LEA6B
+ 14690:  @LEA62:
+ 14691:          rts
+ 14692:  @LEA63:
+ 14693:          lda     VBC_PB1
+ 14694:          bpl     @LEA62
+ 14695:  
+#if CompileDrive >= DRIVE_1570
+ 14697:          jmp     ProcessBus1570
+#elseif CompileDrive >= DRIVE_1541C_02
+ 14699:          jmp     Patch_ClearPALatch_ProcessBus
+#else
+ 14701:          jmp     ProcessBus
+#endif
+ 14703:  
+ 14704:  @LEA6B:
+ 14705:  
+ 14706:   .if CompileDrive >= DRIVE_1570
+ 14707:          jmp     LA9AC
+ 14708:   .else
+ 14709:          jmp     LE8D7
+ 14710:   .endif
+
+
+#if CompileDrive >= DRIVE_1541_01
+ 18557:  LFEF3:
+ 18558:          txa
+ 18559:          ldx     #$05
+ 18560:  LFEF6:
+ 18561:          dex
+ 18562:          bne     LFEF6
+ 18563:          tax
+ 18564:          rts
+ 18565:  
+ 18566:  LFEFB:
+ 18567:          jsr     SetClockOut
+ 18568:          jmp     ClearDataOut
+ 18569:  LFF01:
+ 18570:          lda     CMDBUF + 2
+ 18571:          cmp     #'-'
+ 18572:          beq     LFF0D
+ 18573:          sec
+ 18574:          sbc     #'+'
+ 18575:          bne     LFEE7
+ 18576:  LFF0D:
+ 18577:          sta     DRVTRK + 1
+ 18578:          rts
+#endif
+ 18580:  
+#if CompileDrive >= DRIVE_1541_05
+ 18582:          FillUntil $FF10
+ 18583:  
+ 18584:          ; this is a patch in the RESET routine.
+ 18585:          ; Additionally to setting the DDRA of the BC, also set the DDRB and the PB of the BC,
+ 18586:          ; so the bus is initialized as soon as possible
+ 18587:  PATCH_INIT_BC:
+ 18588:          stx     VBC_DDRA1       ; set the DDR of the port A
+ 18589:  
+ 18590:          ; set DATA OUT, reset CLOCK OUT and ATNA
+ 18591:          lda     #VBC_PB1_1540_DATAOUT
+#if CompileDrive >= DRIVE_1570
+ 18593:          jmp     PATCH_INIT_BC_1570
+#else
+ 18595:          sta     VBC_PB1
+#endif
+ 18597:  PATCH_INIT_BC_1570_END:
+ 18598:          lda     #VBC_PB1_1540_DATAOUT | VBC_PB1_1540_CLOCKOUT | VBC_PB1_1540_ATNA
+ 18599:          sta     VBC_DDRB1
+ 18600:          jmp     PATCH_INIT_BC_END
+ 18601:  
+ 18602:  LFF20:
+ 18603:          lda     VBC_PB1
+ 18604:          and     #VBC_PB1_1540_DATAIN
+ 18605:          bne     LFF20
+ 18606:          lda     #>$0100
+ 18607:          sta     VBC_T1HC1
+ 18608:          jmp     LE9DF
+#endif

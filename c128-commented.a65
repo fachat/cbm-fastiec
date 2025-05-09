@@ -1,0 +1,559 @@
+
+; from https://klasek.at/c64/c128-rom-listing.html
+
+	*=$e33b
+
+; -------------------------------------------------
+; IO
+
+CIA1	=$dc00
+CIA2	=$dd00
+
+CIA_DRA	=$00
+CIA_TAL	=$04
+CIA_TAH	=$05
+CIA_SR	=$0c
+CIA_ICR	=$0d
+CIA_CRA	=$0e
+
+P_DATA	=$80
+P_CLK	=$40
+P_DOUT	=$20
+P_COUT	=$10
+P_AOUT	=$08
+
+VIC	=$d000
+VIC_SPRT=$15
+VIC_FAST=$30
+
+MMU	=$d500
+MMU_MCR	=$05		; MMU mode configuration register
+
+M_FSDIR	=$08
+
+; -------------------------------------------------
+; Memory locations
+
+EOIFL	=$A3
+RXBYT	=$A4
+BITCNT	=$A5
+BUFFLG	=$94
+BYTE	=$95
+STATUS	=$90
+
+BURST_FLG	=$0A1C	; $80 set when fast; $40 set to indicate BURST mode to caller
+SAVE_FAST	=$0A37	; save VIC FAST register
+SAVE_SPRT	=$0A38	; save VIC SPRITE enable register
+
+ILRS232	=$E7EC
+SETST	=$f757
+
+; -------------------------------------------------
+; Constants
+
+IEC_TALK	=$40
+IEC_LISTEN	=$20
+IEC_UNTALK	=$5F
+IEC_UNLISTN	=$3F
+
+; -------------------------------------------------
+; -talk-
+
+E33B:	ORA #IEC_TALK
+E33D:	.BYTE $2C
+
+; -listen-
+
+E33E:	ORA #IEC_LISTEN
+
+	; ignore
+E340:	JSR ILRS232	; Interlock RS-232/Serial
+
+E343:	PHA		; save byte
+E344:	BIT BUFFLG	; byte in out buffer?
+E346:	BPL E352	; no, directly to out-with-atn
+
+E348:	SEC
+E349:	ROR EOIFL	; set EOI
+E34B:	JSR E38C	; Send Data On Serial Bus
+E34E:	LSR BUFFLG	; clear buffer flag
+E350:	LSR EOIFL	; clear EOI
+
+E352:	PLA		; restore byte
+E353:	STA BYTE	; byte to send
+
+E355:	JSR E573	; Stabilize Timing
+
+E358:	JSR E557	; Set Data High
+E35B:	LDA CIA2+CIA_DRA
+E35E:	AND #P_AOUT	; is ATN already set?
+E360:	BNE E374	; yes, skip
+
+E362:	JSR E5D6	; Fast Disk On (set SR to output)
+
+E365:	LDA #$FF
+E367:	STA CIA1+CIA_SR	; send $ff, i.e. DATA stays high, FCLK (SRQ) toggles
+
+E36A:	JSR E5BC	; Prepare For Response, includes Fast serial off?
+
+E36D:	TXA		; wait loop
+E36E:	LDX #$14	; 143 cycles total (inc. TXA/TAX)
+E370:	DEX
+E371:	BNE E370
+E373:	TAX
+
+; skip here if ATN is already set
+E374:	LDA CIA2+CIA_DRA
+E377:	ORA #P_AOUT	; set ATN active
+E379:	STA CIA2+CIA_DRA
+
+; entry point to send SECLISTEN
+
+E37C:	JSR E573	; Stabilize Timing
+E37F:	JSR E54E	; Set Clock Low
+E382:	JSR E557	; Set Data High
+
+E385:	TXA		; wait loop
+E386:	LDX #$B8	; 1291 cycles total (incl. TXA/TAX)
+E388:	DEX
+E389:	BNE E388
+E38B:	TAX
+
+; Send Data On Serial Bus
+
+E38C:	JSR E573	; Stabilize Timing
+E38F:	JSR E557	; Set Data High
+E392:	JSR E569	; Read Serial Lines
+E395:	BCC E39A	; check if data is high
+E397:	JMP E428	; if so, no device present
+
+E39A:	BIT CIA1+CIA_ICR; clear interrupts
+E39D:	JSR E545	; Set Clock High
+E3A0:	BIT EOIFL	; shall we send EOI?
+E3A2:	BPL E3AE	; no, skip waiting for EOI acknowledge
+
+E3A4:	JSR E569	; Read Serial Lines
+E3A7:	BCC E3A4	; wait for DATA high
+
+E3A9:	JSR E569	; Read Serial Lines
+E3AC:	BCS E3A9	; wait for DATA low
+
+E3AE:	LDA CIA2+CIA_DRA
+E3B1:	CMP CIA2+CIA_DRA
+E3B4:	BNE E3AE	; debounce serial lines
+E3B6:	PHA
+E3B7:	LDA CIA1+CIA_ICR
+E3BA:	AND #$08	; check if SR has received a byte
+E3BC:	BEQ E3C3	; no, then skip
+
+E3BE:	LDA #$C0	; set flag that drive is FAST
+E3C0:	STA BURST_FLG	; Fast Serial Internal/External Flag
+
+E3C3:	PLA
+E3C4:	BPL E3AE	; wait for CLK high
+E3C6:	ORA #P_COUT	; When device has set CLK high, set CLK low ourself
+E3C8:	STA CIA2+CIA_DRA
+E3CB:	AND #P_AOUT	; is ATN output active?
+E3CD:	BNE E3E2	; yes, then skip
+
+E3CF:	BIT BURST_FLG	; Fast Serial Internal/External Flag
+E3D2:	BPL E3E2	; not fast, then skip
+
+E3D4:	JSR E5D6	; Fast Disk On
+E3D7:	LDA BYTE
+E3D9:	STA CIA1+CIA_SR	; send byte via SR
+E3DC:	JSR E5BC	; Prepare For Response
+E3DF:	JMP E412	; finish sending via SR
+
+; send slow byte
+
+E3E2:	LDA #$08
+E3E4:	STA BITCNT
+
+	.assert P_DATA == $80, "Bit check mismatch"
+E3E6:	LDA CIA2+CIA_DRA
+E3E9:	CMP CIA2+CIA_DRA
+E3EC:	BNE E3E6	; debounce
+E3EE:	ASL
+E3EF:	BCC E425	; if DATA is low, return send timeout
+
+E3F1:	ROR BYTE	; set DATA out to bit
+E3F3:	BCS E3FA
+E3F5:	JSR E560	; Set Data Low
+E3F8:	BNE E3FD
+
+E3FA:	JSR E557	; Set Data High
+
+E3FD:	JSR E545	; Set Clock High
+E400:	NOP
+E401:	NOP
+E402:	NOP
+E403:	NOP
+E404:	LDA CIA2+CIA_DRA
+E407:	AND #255-P_DOUT	; DATA high again
+E409:	ORA #P_COUT	; CLK low again
+E40B:	STA CIA2+CIA_DRA
+E40E:	DEC BITCNT	; next bit
+E410:	BNE E3E6
+
+; finish sending via SR
+
+E412:	TXA
+E413:	PHA
+E414:	LDX #$22	; loop to wait for response
+
+E416:	JSR E569	; Read Serial Lines
+E419:	BCS E420	; DATA still high, then next
+
+E41B:	PLA
+E41C:	TAX		; restore X
+E41D:	JMP E59F	; Restore Timing, return
+
+E420:	DEX
+E421:	BNE E416
+E423:	PLA
+E424:	TAX
+
+; -------------------------------------------------
+E425:	LDA #$03	; send timeout error
+E427:	.BYTE $2C
+
+E428:	LDA #$80	; Device not present error
+
+E42A:	PHA
+E42B:	LDA BURST_FLG	; Fast Serial Internal/External Flag
+E42E:	AND #$7F
+E430:	STA BURST_FLG	; Fast Serial Internal/External Flag
+E433:	PLA
+E434:	JSR SETST	; Set Status Bit
+E437:	JSR E59F	; Restore Timing
+E43A:	CLC
+E43B:	JMP E535	; Reset ATN
+
+; -------------------------------------------------
+; -acptr-
+
+IECIN
+E43E:	JSR E573	; Stabilize Timing
+
+E441:	LDA #$00
+E443:	STA BITCNT
+E445:	BIT CIA1+CIA_ICR; clear interrupts
+
+E448:	TXA
+E449:	PHA		; save XR
+
+E44A:	JSR E545	; Set Clock High
+
+E44D:	JSR E569	; Read Serial Lines
+E450:	BPL E44D	; wait for CLK high
+
+E452:	LDX #$0D	; 13 iterations to wait for DATA low 
+
+E454:	LDA CIA2+CIA_DRA
+E457:	AND #255-P_DOUT	; set DATA high
+E459:	STA CIA2+CIA_DRA
+
+E45C:	LDA CIA2+CIA_DRA
+E45F:	CMP CIA2+CIA_DRA
+E462:	BNE E45C	; debounce
+E464:	ASL
+E465:	BPL E484	; if CKL is low, continue (to E484)
+E467:	DEX
+E468:	BNE E45C	; next try
+
+E46A:	LDA BITCNT
+E46C:	BNE E47D	; EOI already received, then read timeout
+
+E46E:	JSR E560	; Set Data Low
+E471:	JSR E545	; Set Clock High
+E474:	LDA #$40
+E476:	JSR SETST	; Set Status Bit to EOI
+E479:	INC BITCNT	; set flag for EOI received
+E47B:	BNE E452	; always
+
+E47D:	PLA
+E47E:	TAX		; restore X
+E47F:	LDA #$02	; read timeout
+E481:	JMP E42A
+
+E484:	LDX #$08	; bit count
+
+E486:	LDA CIA1+CIA_ICR
+E489:	AND #$08	; is SR receive interrupt set?
+E48B:	BNE E4B5	; yes, then receive fast byte
+
+; receive slow byte
+
+E48D:	LDA CIA2+CIA_DRA
+E490:	CMP CIA2+CIA_DRA
+E493:	BNE E48D	; debounce
+E495:	ASL		; put DATA into C
+E496:	BPL E486	; wait for CLK high
+
+E498:	ROR RXBYT	; save DATA in received byte
+
+E49A:	LDA CIA2+CIA_DRA
+E49D:	CMP CIA2+CIA_DRA
+E4A0:	BNE E49A
+E4A2:	ASL
+E4A3:	BMI E49A	; wait CLK low
+E4A5:	DEX
+E4A6:	BEQ E4BF
+
+E4A8:	LDA CIA2+CIA_DRA
+E4AB:	CMP CIA2+CIA_DRA
+E4AE:	BNE E4A8
+E4B0:	ASL
+E4B1:	BPL E4A8	; wait CLK high
+E4B3:	BMI E498	; always, save next bit
+
+; receive fast byte
+
+E4B5:	LDA CIA1+CIA_SR
+E4B8:	STA RXBYT
+E4BA:	LDA #$C0
+E4BC:	STA BURST_FLG	; Fast Serial Internal/External Flag
+
+; end slow/fast receive
+
+E4BF:	PLA
+E4C0:	TAX
+E4C1:	JSR E560	; Set Data Low
+E4C4:	BIT STATUS 	; Status word ST
+E4C6:	BVC E4CB
+E4C8:	JSR E538	; reset CLK+DATA
+
+E4CB:	JSR E59F	; Restore Timing
+E4CE:	LDA RXBYT
+E4D0:	CLC
+E4D1:	RTS
+
+; -------------------------------------------------
+; -second-
+
+SECLISTEN
+E4D2:	STA BYTE
+E4D4:	JSR E37C
+
+; -------------------------------------------------
+; Set ATN High
+
+E4D7:	LDA CIA2+CIA_DRA
+E4DA:	AND #255-P_AOUT
+E4DC:	STA CIA2+CIA_DRA
+E4DF:	RTS
+
+; -------------------------------------------------
+; -tksa-
+
+SECTALK
+E4E0:	STA BYTE
+E4E2:	JSR E37C
+E4E5:	BIT STATUS 	; Status word ST
+E4E7:	BMI E535	; Reset ATN
+
+E4E9:	JSR E573	; Stabilize Timing
+E4EC:	JSR E560	; Set Data Low
+E4EF:	JSR E4D7	; Set ATN High
+E4F2:	JSR E545	; Set Clock High
+
+E4F5:	LDA CIA2+CIA_DRA
+E4F8:	CMP CIA2+CIA_DRA
+E4FB:	BNE E4F5
+E4FD:	ASL
+E4FE:	BMI E4F5
+E500:	JMP E59F	; Restore Timing
+
+; -ciout-  Print Serial
+
+IECOUT
+E503:	BIT BUFFLG	; is there a byte in the buffer?
+E505:	BMI E50C	; if yes, then send it
+E507:	SEC		; if not, ...
+E508:	ROR BUFFLG	; set flag for byte in buffer
+E50A:	BNE E511	; (always) store byte and end
+
+E50C:	PHA		; save new byte
+E50D:	JSR E38C	; Send Data from buffer On Serial Bus
+E510:	PLA
+
+E511:	STA BYTE	; store new byte into buffer
+E513:	CLC
+E514:	RTS
+
+; -------------------------------------------------
+; -untlk-
+UNTALK
+E515:	JSR E573	; Stabilize Timing
+E518:	JSR E54E	; Set Clock Low
+E51B:	LDA CIA2+CIA_DRA
+E51E:	ORA #$08
+E520:	STA CIA2+CIA_DRA
+E523:	LDA #$5F
+E525:	.BYTE $2C
+
+; -unlsn-
+UNLISTEN
+E526:	LDA #$3F
+E528:	PHA
+E529:	LDA BURST_FLG	; Fast Serial Internal/External Flag
+E52C:	AND #$7F
+E52E:	STA BURST_FLG	; Fast Serial Internal/External Flag
+E531:	PLA
+E532:	JSR E343
+
+; -------------------------------------------------
+; low level routines
+
+; Reset ATN
+
+E535:	JSR E4D7	; Set ATN High
+
+E538:	TXA
+E539:	LDX #$0A
+
+E53B:	DEX
+E53C:	BNE E53B
+E53E:	TAX
+E53F:	JSR E545	; Set Clock High
+E542:	JMP E557	; Set Data High
+
+; Set Clock High
+
+E545:	LDA CIA2+CIA_DRA
+E548:	AND #$EF
+E54A:	STA CIA2+CIA_DRA
+E54D:	RTS
+
+; Set Clock Low
+
+E54E:	LDA CIA2+CIA_DRA
+E551:	ORA #$10
+E553:	STA CIA2+CIA_DRA
+E556:	RTS
+
+; Set Data High
+
+E557:	LDA CIA2+CIA_DRA
+E55A:	AND #$DF
+E55C:	STA CIA2+CIA_DRA
+E55F:	RTS
+
+; Set Data Low
+
+E560:	LDA CIA2+CIA_DRA
+E563:	ORA #$20
+E565:	STA CIA2+CIA_DRA
+E568:	RTS
+
+; Read Serial Lines
+
+; return DATA in C, CLK in N-flag
+	.assert P_DATA == $80, "Bit check mismatch"
+	.assert P_CLK == $40, "Bit check mismatch"
+E569:	LDA CIA2+CIA_DRA
+E56C:	CMP CIA2+CIA_DRA
+E56F:	BNE E569	; Read Serial Lines
+E571:	ASL
+E572:	RTS
+
+; -------------------------------------------------
+; Stabilize Timing
+; 
+; SAVE_FAST stores a copy of the VIC-IIe FAST register
+; As unused bits read '1', bit 7 is usually set.
+; Except when we clear SAVE_FAST. This is used to 
+; indicate if we have previously checked the speed.
+;
+
+E573:	SEI
+
+E574:	BIT $0A3A	; flag $0a3a.7 set?
+E577:	BMI E59E	; yes, then end
+E579:	BIT SAVE_FAST	; have we checked speed before?
+E57C:	BMI E59E	; yes, then end
+
+E57E:	LDA VIC+VIC_FAST	; VIC-IIe FAST; bit 0 set is 2MHz
+E581:	STA SAVE_FAST	; save value (sets bit 7 - unused bits read 1)
+E584:	LDA VIC+VIC_SPRT	; Sprite enable register
+E587:	STA SAVE_SPRT	; save value
+
+E58A:	LDA #$00	
+E58C:	STA VIC+VIC_SPRT	; disable all sprites
+E58F:	STA VIC+VIC_FAST	; go to slow mode
+
+E592:	LDA SAVE_SPRT	; have any sprites been enabled?
+E595:	BEQ E59E	; no, then end
+E597:	TXA		; otherwise delay at least one rasterline
+E598:	LDX #$00
+
+E59A:	DEX
+E59B:	BNE E59A
+E59D:	TAX
+
+E59E:	RTS
+
+; Restore Timing
+
+E59F:	BIT $0A3A	; flag $0a3a.7 is set?
+E5A2:	BMI E5BA	; yes then end
+E5A4:	BIT SAVE_FAST	; timing changed (from Stabilize timing above)?
+E5A7:	BPL E5BA	; no then end
+
+E5A9:	LDA SAVE_SPRT
+E5AC:	STA VIC+VIC_SPRT
+E5AF:	LDA SAVE_FAST
+E5B2:	STA VIC+VIC_FAST
+E5B5:	LDA #$00	; store zero in FAST store byte
+E5B7:	STA SAVE_FAST	; make sure next time we check timing
+
+E5BA:	CLI
+E5BB:	RTS
+
+; -------------------------------------------------
+; Prepare For Response
+
+E5BC:	LDA CIA1+CIA_ICR
+E5BF:	AND #$08	; wait for SDR full interrupt source
+E5C1:	BEQ E5BC	; Prepare For Response
+
+; Fast Disk Off
+
+E5C3:	LDA CIA1+CIA_CRA	; control register A
+E5C6:	AND #$80		; clear all but TOD/ALARM bit
+E5C8:	ORA #$08		; set one-shot bit
+E5CA:	STA CIA1+CIA_CRA
+E5CD:	LDA MMU+MMU_MCR		; enable fast serial _input_
+E5D0:	AND #255-M_FSDIR
+E5D2:	STA MMU+MMU_MCR
+E5D5:	RTS
+
+; Fast Disk On
+
+E5D6:	LDA MMU+MMU_MCR
+E5D9:	ORA #M_FSDIR		; enable fast serial _output_
+E5DB:	STA MMU+MMU_MCR
+E5DE:	LDA #$7F
+E5E0:	STA CIA1+CIA_ICR	; disable all interrupt sources
+E5E3:	LDA #$00
+E5E5:	STA CIA1+CIA_TAH
+E5E8:	LDA #$04
+E5EA:	STA CIA1+CIA_TAL	; set timer to 4
+E5ED:	LDA CIA1+CIA_CRA	; control register A
+E5F0:	AND #$80		; clear all but TOD/ALARM bit
+E5F2:	ORA #$55		; start timer, load latch once, SR to output, (PB6 is toggle on underflow, but not enabled)
+E5F4:	STA CIA1+CIA_CRA
+E5F7:	BIT CIA1+CIA_ICR	; clear all interrupts
+E5FA:	RTS
+
+; Fast Disk On/Off
+
+E5FB:	BCC E5C3	; Fast Disk Off
+E5FD:	BCS E5D6	; Fast Disk On
+
+
+; -------------------------------------------------
+; -------------------------------------------------
+
+

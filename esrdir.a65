@@ -1,0 +1,128 @@
+
+/*
+ * this file installs the dosrom driver in bank 7 and patches the BASIC 4 ROM
+ * to include the ROM usb companion functions.
+ *
+ * Therefore, at the end of this file, a page of companion code is expected that is
+ * installed into $dfxx in BASIC ROM.
+ * After that, up to 16k of USB driver code and data are expected, that are copied
+ * to $1000 in bank 7 (where the USB driver code resides)
+ */
+
+DEV	=9
+
+	.word $0401
+	*=$0401
+
+	.word eol		; BASIC link pointer
+	.word 10		; line number
+	.byt $9e, "1040", 0	; BASIC code (tokenized)
+eol	.word 0			; BASIC link pointer, 0 means end of code
+	.dsb 1040-*
+
+start
+	jsr fiec_init
+
+	jsr read_dir
+
+	rts
+
+	; ---------------------------------------------
+	; read and print the disk directory
+read_dir .(
+	
+	; open the file
+
+        lda #DEV
+        jsr LISTEN
+
+        lda #$f0	; open secondary address 0
+        jsr SECLISTEN
+
+        lda #"$"
+        jsr IECOUT
+
+        lda #"0"
+        jsr IECOUT
+
+        jsr UNLISTEN
+
+	; show status
+
+	jsr read_st
+	; TODO break on error
+
+	; read the directory
+	lda #DEV
+	jsr TALK
+
+	lda #$60	; secondary address 0
+	jsr SECTALK
+
+	jsr IECIN	; load adress
+	jsr IECIN
+
+line	jsr crout
+
+	jsr IECIN	; link pointer
+	tay
+	jsr IECIN
+	tax 		; a zero link pointer means end of listing
+	bne doline
+	tya
+	beq end
+doline
+	jsr IECIN	; number of blocks
+	tay
+	jsr IECIN
+	tax
+	tya
+	jsr print_int16	; print as decimal
+
+	jsr spout
+
+char	lda STATUS
+	bne prstat
+
+	jsr IECIN
+	tay
+	beq line
+
+	;and #%01100000
+	;beq xout
+	;tya
+	;.byt $2c
+xout	;lda #"."
+	jsr $ffd2	
+
+	bra char
+
+end	jsr UNTALK
+
+	; close file
+close
+	lda #DEV
+	jsr LISTEN
+	lda #$e0	; close secondary 0
+	jsr SECLISTEN
+	jsr UNLISTEN
+	
+	rts
+prstat	pha
+	jsr crout
+	pla
+	jsr hexout
+	jsr crout
+	jmp close
+
+xIECIN	jsr IECIN
+	pha
+	jsr hexout
+	pla
+	rts
+	.)
+
+#include "common.a65"
+
+#include "upet-fiec-esr-core.a65"
+

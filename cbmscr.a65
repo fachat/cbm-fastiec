@@ -1,0 +1,75 @@
+
+/*
+ * this file installs the dosrom driver in bank 7 and patches the BASIC 4 ROM
+ * to include the ROM usb companion functions.
+ *
+ * Therefore, at the end of this file, a page of companion code is expected that is
+ * installed into $dfxx in BASIC ROM.
+ * After that, up to 16k of USB driver code and data are expected, that are copied
+ * to $1000 in bank 7 (where the USB driver code resides)
+ */
+
+STATUS          =$96
+
+TALK2           =$f0d2
+LISTEN2         =$f0d5
+SECTALK         =$f193
+SECLISTEN       =$f143
+UNTALK          =$f1ae
+UNLISTEN        =$f1b9
+IECOUT          =$f19e
+IECIN           =$f1c0
+
+curdev  =$d4
+
+DEV	=9
+
+	.word $0401
+	*=$0401
+
+	.word eol		; BASIC link pointer
+	.word 10		; line number
+	.byt $9e, "1040", 0	; BASIC code (tokenized)
+eol	.word 0			; BASIC link pointer, 0 means end of code
+	.dsb 1040-*
+
+start
+	jsr send_cmd
+
+	jsr read_st
+
+	rts
+
+send_cmd
+	.(
+	lda #0
+	sta STATUS
+
+	lda #DEV
+	jsr LISTEN
+
+	lda #15+$60
+	jsr SECLISTEN
+
+	ldy #0
+l	lda cmd,y
+	beq le
+	jsr IECOUT
+	iny
+	bne l
+le
+	jsr UNLISTEN
+	rts
+
+cmd	.asc "S0:PSEUDO64K",0
+
+	.)
+
+TALK    sta curdev
+        jmp TALK2
+
+LISTEN  sta curdev
+        jmp LISTEN2
+
+#include "common.a65"
+

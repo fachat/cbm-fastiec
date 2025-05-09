@@ -1,0 +1,206 @@
+
+/*
+ * Verify a file with 64k of pseudo random data
+ */
+
+DEV	=9
+
+	.word $0401
+	*=$0401
+
+	.word eol		; BASIC link pointer
+	.word 10		; line number
+	.byt $9e, "1040", 0	; BASIC code (tokenized)
+eol	.word 0			; BASIC link pointer, 0 means end of code
+	.dsb 1040-*
+
+start
+	jsr fiec_init
+
+	jsr vf64kfile
+
+	rts
+
+filename 
+	.asc "PSEUDO64K",0
+
+	; ---------------------------------------------
+	; create a file containing 64k of pseudo-random data
+
+vf64kfile .(
+
+	lda #<descr
+	ldy #>descr
+	jsr txtout
+	
+	; open the file
+
+        lda #DEV
+        jsr LISTEN
+
+        lda #$f0	; open secondary address 1 (save)
+        jsr SECLISTEN
+
+	ldy #0
+l	lda filename,y
+	beq le
+        jsr IECOUT
+	iny
+	bne l
+le
+        jsr UNLISTEN
+
+	; show status
+
+	jsr read_st
+	; TODO break on error
+
+	jsr crout
+	jsr rng_init
+
+	lda #0
+	sta counter
+	sta counter+1
+	sta counter+3
+	sta biterrs
+	sta biterrs+1
+	sta biterrs+2
+	sta accum
+	sta accum+1
+	sta accum+2
+
+	; write the file
+	lda #DEV
+	jsr TALK
+
+	lda #$60	; secondary address 0
+	jsr SECTALK
+
+loop
+	jsr rng_next
+	sta byte
+	jsr IECIN
+	cmp byte
+	beq dot
+
+	; bit error
+	inc biterrs
+	bne ex
+	inc biterrs+1
+	bne ex
+	inc biterrs+2
+ex
+	tay
+	jsr hexout
+	lda byte
+	jsr hexout
+	tya
+	eor byte
+	pha
+	jsr hexout
+	pla
+	clc
+	adc accum
+	sta accum
+	bcc ex2
+	inc accum+1
+	bne ex2
+	inc accum+2
+
+ex2	lda #"!"
+	jsr $ffd2
+	jsr spout
+dot
+	inc counter
+	bne chk
+	inc counter+1
+	bne chk
+	inc counter+2
+chk
+	lda STATUS
+	beq loop
+	jsr hexout
+
+	lda STATUS
+	and #$c0
+	bne dnp
+
+	lda #0
+	sta STATUS
+
+	lda counter
+	ora counter+1
+	bne loop
+dnp
+	jsr crout
+	jsr hexout
+
+end	jsr UNTALK
+
+	; close file
+close
+	lda #DEV
+	jsr LISTEN
+	lda #$e0	; close secondary 0
+	jsr SECLISTEN
+	jsr UNLISTEN
+	
+               ;-----------------
+               ; end of streak, print stats
+	lda #<descr
+	ldy #>descr
+	jsr txtout
+	
+               LDA #<stats1
+               LDY #>stats1
+               JSR txtout
+               LDX #counter - cbase
+               JSR hex3out
+
+               LDA #<stats2
+               LDY #>stats2
+               JSR txtout
+               LDX #biterrs - cbase
+               JSR hex3out
+
+               LDA #<stats3
+               LDY #>stats3
+               JSR txtout
+               LDX #accum - cbase
+               JSR hex3out
+
+               LDA #13
+               JSR $FFD2
+	rts
+
+               ; ---------------------------------------
+               ; print a 3-byte hex value of a memory location 
+               ; with XR holding the relative offset to cbase
+hex3out         lda cbase+2,x
+                jsr hexout
+                lda cbase+1,x
+                jsr hexout
+                lda cbase,x
+		jmp hexout
+
+descr		.asc "1 RX, 2 EXPECT, 3 XOR",13
+
+stats1          .asc 13
+                .asc "STATISTICS:",13
+                .asc "BYTES RX'D: ", 0
+stats2          .asc 13,
+                .asc "BIT ERRORS: ", 0
+stats3          .asc 13,
+                .asc "ACCUM BITS: ", 0
+cbase
+counter	.byt 0,0,0
+biterrs	.byt 0,0,0
+accum	.byt 0,0,0
+
+byte	.byt 0
+	.)
+
+#include "common.a65"
+
+#include "upet-fiec-core.a65"
+

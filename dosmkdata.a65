@@ -1,0 +1,101 @@
+
+/*
+ * creates a 64k size file with pseudo-random data
+ */
+
+DEV	=9
+
+	.word $0401
+	*=$0401
+
+	.word eol		; BASIC link pointer
+	.word 10		; line number
+	.byt $9e, "1040", 0	; BASIC code (tokenized)
+eol	.word 0			; BASIC link pointer, 0 means end of code
+	.dsb 1040-*
+
+start
+	jsr fiec_init
+
+	jsr mk64kfile
+
+	rts
+
+filename 
+	.asc "PSEUDO64K",0
+
+	; ---------------------------------------------
+	; create a file containing 64k of pseudo-random data
+
+mk64kfile .(
+	
+	; open the file
+
+        lda #DEV
+        jsr LISTEN
+
+        lda #$f1	; open secondary address 1 (save)
+        jsr SECLISTEN
+
+	ldy #0
+l	lda filename,y
+	beq le
+        jsr IECOUT
+	iny
+	bne l
+le
+        jsr UNLISTEN
+
+	; show status
+
+	jsr read_st
+	; TODO break on error
+
+	jsr rng_init
+
+	lda #0
+	sta counter
+	sta counter+1
+
+	; write the file
+	lda #DEV
+	jsr LISTEN
+
+	lda #$61	; secondary address 0
+	jsr SECLISTEN
+
+loop
+	jsr rng_next
+	jsr IECOUT
+
+	inc counter
+	bne loop
+	inc counter+1
+	bne loop
+
+end	jsr UNLISTEN
+
+	; close file
+close
+	lda #DEV
+	jsr LISTEN
+	lda #$e1	; close secondary 0
+	jsr SECLISTEN
+	jsr UNLISTEN
+	
+	rts
+prstat	pha
+	jsr crout
+	pla
+	jsr hexout
+	jsr crout
+	jmp close
+
+counter	.word 0
+
+	.)
+
+#include "common.a65"
+
+#include "upet-fiec-core.a65"
+

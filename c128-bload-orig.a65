@@ -1,0 +1,538 @@
+
+; -load-
+
+F265:	STX $C3
+F267:	STY $C4
+
+F269:	JMP ($0330)	; LOAD Link [F26C]
+
+; -kernalload-
+
+F26C:	STA $93 	; Work value, monitor, LOAD / SAVE 0 = LOAD, 1 = VERIFY
+F26E:	LDA #$00
+F270:	STA $90 	; Status word ST
+F272:	LDA $BA 	; Current device
+F274:	CMP #$04
+F276:	BCS $F27B	; Serial Load
+F278:	JMP $F326
+
+; Serial Load
+
+F27B:	LDA $0A1C	; Fast Serial Internal/External Flag
+F27E:	AND #$BE
+F280:	STA $0A1C	; Fast Serial Internal/External Flag
+F283:	LDX $B9 	; Current secondary address
+F285:	STX $9E
+F287:	LDY $B7 	; Number of characters in file name
+F289:	BNE $F28E
+F28B:	JMP $F31A
+
+F28E:	STY $9F
+F290:	JSR $F50F	; Print 'searching'
+F293:	JSR $F3A1	; Disk Load
+F296:	BCS $F29B
+F298:	JMP $F39B
+
+F29B:	LDY $9F
+F29D:	STY $B7 	; Number of characters in file name
+F29F:	LDA #$60
+F2A1:	STA $B9 	; Current secondary address
+F2A3:	JSR $F0CB	; Check Serial Open
+F2A6:	LDA $BA 	; Current device
+F2A8:	JSR $E33B	; -talk-
+F2AB:	LDA $B9 	; Current secondary address
+F2AD:	JSR $E4E0	; -tksa-
+F2B0:	JSR $E43E	; -acptr-
+F2B3:	STA $AE 	; Tape end address / End of program
+F2B5:	JSR $E43E	; -acptr-
+F2B8:	STA $AF
+F2BA:	LDA $90 	; Status word ST
+F2BC:	LSR A
+F2BD:	LSR A
+F2BE:	BCS $F317
+F2C0:	LDA $9E
+F2C2:	BNE $F2CC
+F2C4:	LDA $C3
+F2C6:	STA $AE 	; Tape end address / End of program
+F2C8:	LDA $C4
+F2CA:	STA $AF
+
+F2CC:	JSR $FC4A	; ?
+
+F2CF:	LDA #$FD
+F2D1:	AND $90 	; Status word ST
+F2D3:	STA $90 	; Status word ST
+F2D5:	JSR $FFE1	; (istop)       Test-Stop Vector [F66E]
+F2D8:	BEQ $F323
+F2DA:	JSR $E43E	; -acptr-
+F2DD:	TAX
+F2DE:	LDA $90 	; Status word ST
+F2E0:	LSR A
+F2E1:	LSR A
+F2E2:	BCS $F2CF
+F2E4:	TXA
+F2E5:	LDY $93 	; Work value, monitor, LOAD / SAVE 0 = LOAD, 1 = VERIFY
+F2E7:	BEQ $F2FB
+F2E9:	STA $BD
+F2EB:	LDY #$00
+F2ED:	JSR $F7C9	; Read Byte to be Saved
+F2F0:	CMP $BD
+F2F2:	BEQ $F2FE
+F2F4:	LDA #$10
+F2F6:	JSR $F757	; Set Status Bit
+F2F9:	BNE $F2FE
+
+F2FB:	JSR $F7BF
+
+F2FE:	INC $AE 	; Tape end address / End of program
+F300:	BNE $F30A
+F302:	INC $AF
+F304:	LDA $AF
+F306:	CMP #$FF
+F308:	BEQ $F320
+
+F30A:	BIT $90 	; Status word ST
+F30C:	BVC $F2CF
+F30E:	JSR $E515	; -untlk-
+F311:	JSR $F59E
+F314:	JMP $F39B
+
+F317:	JMP $F685	; Print 'file not found'
+
+F31A:	JMP $F691	; Print 'missing file name'
+
+F31D:	JMP $F694	; Print 'illegal device no'
+
+F320:	JMP $F697	; Error #0
+
+F323:	JMP $F5B5	; Terminate Serial Input
+
+F326:	CMP #$01
+F328:	BNE $F31D
+
+; Tape Load
+
+F32A:	JSR $E980	; Get Buffer Address
+F32D:	BCC $F31D
+F32F:	JSR $E9C8	; Print 'press play on tape'
+F332:	BCS $F3A0
+F334:	JSR $F50F	; Print 'searching'
+
+F337:	LDA $B7 	; Number of characters in file name
+F339:	BEQ $F344
+F33B:	JSR $E99A	; Find Specific Header
+F33E:	BCC $F34B
+F340:	BEQ $F3A0
+F342:	BCS $F317
+
+F344:	JSR $E8D0	; Find Any Tape Header
+F347:	BEQ $F3A0
+F349:	BCS $F317
+
+F34B:	SEC
+F34C:	LDA $90 	; Status word ST
+F34E:	AND #$10
+F350:	BNE $F3A0
+F352:	CPX #$01
+F354:	BEQ $F367
+F356:	CPX #$03
+F358:	BNE $F337
+
+F35A:	LDY #$01
+F35C:	LDA ($B2),Y
+F35E:	STA $C3
+F360:	INY
+F361:	LDA ($B2),Y
+F363:	STA $C4
+F365:	BCS $F36B
+
+F367:	LDA $B9 	; Current secondary address
+F369:	BNE $F35A
+
+F36B:	LDY #$03
+F36D:	LDA ($B2),Y
+F36F:	LDY #$01
+F371:	SBC ($B2),Y
+F373:	TAX
+F374:	LDY #$04
+F376:	LDA ($B2),Y
+F378:	LDY #$02
+F37A:	SBC ($B2),Y
+F37C:	TAY
+F37D:	CLC
+F37E:	TXA
+F37F:	ADC $C3
+F381:	STA $AE 	; Tape end address / End of program
+F383:	TYA
+F384:	ADC $C4
+F386:	STA $AF
+F388:	CMP #$FF
+F38A:	BEQ $F320
+F38C:	LDA $C3
+F38E:	STA $C1
+F390:	LDA $C4
+F392:	STA $C2
+F394:	JSR $F533	; Print 'loading'
+F397:	JSR $E9FB
+F39A:	.BYTE $24
+
+F39B:	CLC
+F39C:	LDX $AE 	; Tape end address / End of program
+F39E:	LDY $AF
+
+F3A0:	RTS
+
+; Disk Load
+
+F3A1:	LDY #$00
+F3A3:	JSR $F7AE	; Get Char From Memory
+F3A6:	CMP #$24
+F3A8:	BEQ $F3A0
+F3AA:	LDX $BA 	; Current device
+F3AC:	LDY #$0F
+F3AE:	LDA #$00
+F3B0:	JSR $F738	; -setlfs-
+F3B3:	STA $B7 	; Number of characters in file name
+F3B5:	JSR $FFC0	; (iopen)       Open Vector [EFBD]
+F3B8:	LDX $B8 	; Current logical file
+F3BA:	JSR $FFC9	; (ichkout)     Set Output [F14C]
+F3BD:	BCC $F3C7
+F3BF:	JSR $F48C	; Close Off Serial
+F3C2:	PLA
+F3C3:	PLA
+F3C4:	JMP $F688	; Print 'device not present'
+
+F3C7:	LDY #$03
+
+F3C9:	LDA $F50B,Y
+F3CC:	JSR $FFD2	; (ibsout)      Output Vector, chrout [EF79]
+F3CF:	DEY
+F3D0:	BNE $F3C9
+
+F3D2:	JSR $F7AE	; Get Char From Memory
+F3D5:	JSR $FFD2	; (ibsout)      Output Vector, chrout [EF79]
+F3D8:	INY
+F3D9:	CPY $9F
+F3DB:	BNE $F3D2
+F3DD:	JSR $FFCC	; (iclrch)      Restore I/O Vector [F226]
+F3E0:	BIT $0A1C	; Fast Serial Internal/External Flag
+F3E3:	BVS $F3EA	; Burst Load
+F3E5:	JSR $F48C	; Close Off Serial
+F3E8:	SEC
+F3E9:	RTS
+
+; Burst Load
+
+F3EA:	LDA $9F
+F3EC:	STA $B7 	; Number of characters in file name
+F3EE:	SEI
+F3EF:	JSR $E545	; Set Clock High
+F3F2:	JSR $E5C3	; Fast Disk Off
+F3F5:	BIT $DC0D
+F3F8:	JSR $F503	; Toggle Clock Line
+F3FB:	JSR $F4BA	; Get Serial Byte
+F3FE:	CMP #$02
+F400:	BNE $F40A
+F402:	JSR $F48C	; Close Off Serial
+F405:	PLA
+F406:	PLA
+F407:	JMP $F685	; Print 'file not found'
+
+F40A:	PHA
+F40B:	CMP #$1F
+F40D:	BNE $F41A
+F40F:	JSR $F503	; Toggle Clock Line
+F412:	JSR $F4BA	; Get Serial Byte
+F415:	STA $A5
+F417:	JMP $F421
+
+F41A:	CMP #$02
+F41C:	BCC $F421
+F41E:	PLA
+F41F:	BCS $F498
+
+F421:	JSR $F533	; Print 'loading'
+F424:	JSR $F503	; Toggle Clock Line
+F427:	JSR $F4BA	; Get Serial Byte
+F42A:	STA $AE 	; Tape end address / End of program
+F42C:	JSR $F503	; Toggle Clock Line
+F42F:	JSR $F4BA	; Get Serial Byte
+F432:	STA $AF
+F434:	LDX $9E
+F436:	BNE $F440
+F438:	LDA $C3
+F43A:	LDX $C4
+F43C:	STA $AE 	; Tape end address / End of program
+F43E:	STX $AF
+
+F440:	LDA $AE 	; Tape end address / End of program
+F442:	LDX $AF
+F444:	STA $AC
+F446:	STX $AD
+F448:	PLA
+F449:	CMP #$1F
+F44B:	BEQ $F47F
+F44D:	JSR $F503	; Toggle Clock Line
+F450:	LDA #$FC
+F452:	STA $A5
+
+F454:	JSR $F63D	; Watch For RUN or Shift
+F457:	JSR $FFE1	; (istop)       Test-Stop Vector [F66E]
+F45A:	BEQ $F4A6
+F45C:	JSR $F4C5	; Receive Serial Byte
+F45F:	BCS $F4B2
+F461:	JSR $F4BA	; Get Serial Byte
+F464:	CMP #$02
+F466:	BCC $F46E
+F468:	CMP #$1F
+F46A:	BEQ $F477
+F46C:	BNE $F498
+
+F46E:	JSR $F503	; Toggle Clock Line
+F471:	LDA #$FE
+F473:	STA $A5
+F475:	BNE $F454
+
+F477:	JSR $F503	; Toggle Clock Line
+F47A:	JSR $F4BA	; Get Serial Byte
+F47D:	STA $A5
+
+F47F:	JSR $F503	; Toggle Clock Line
+F482:	JSR $F4C5	; Receive Serial Byte
+F485:	BCS $F4B2
+F487:	LDA #$40
+F489:	JSR $F757	; Set Status Bit
+
+; Close Off Serial
+
+F48C:	JSR $E545	; Set Clock High
+F48F:	CLI
+F490:	LDA $B8 	; Current logical file
+F492:	SEC
+F493:	JSR $FFC3	; (iclose)      Close Vector [F188]
+F496:	CLC
+F497:	RTS
+
+F498:	LDA #$02
+F49A:	JSR $F757	; Set Status Bit
+F49D:	JSR $F48C	; Close Off Serial
+F4A0:	PLA
+F4A1:	PLA
+F4A2:	LDA #$29
+F4A4:	SEC
+F4A5:	RTS
+
+F4A6:	JSR $F48C	; Close Off Serial
+F4A9:	LDA #$00
+F4AB:	STA $B9 	; Current secondary address
+F4AD:	PLA
+F4AE:	PLA
+F4AF:	JMP $F5B5	; Terminate Serial Input
+
+F4B2:	JSR $F48C	; Close Off Serial
+F4B5:	PLA
+F4B6:	PLA
+F4B7:	JMP $F697	; Error #0
+
+; Get Serial Byte
+
+F4BA:	LDA #$08
+
+F4BC:	BIT $DC0D
+F4BF:	BEQ $F4BC
+F4C1:	LDA $DC0C
+F4C4:	RTS
+
+; Receive Serial Byte
+
+F4C5:	LDA #$08
+
+F4C7:	BIT $DC0D
+F4CA:	BEQ $F4C7
+F4CC:	LDY $DC0C
+F4CF:	LDA $DD00
+F4D2:	EOR #$10
+F4D4:	STA $DD00
+F4D7:	TYA
+F4D8:	LDY $93 	; Work value, monitor, LOAD / SAVE 0 = LOAD, 1 = VERIFY
+F4DA:	BEQ $F4EE
+F4DC:	STA $BD
+F4DE:	LDY #$00
+F4E0:	JSR $F7C9	; Read Byte to be Saved
+F4E3:	CMP $BD
+F4E5:	BEQ $F4F1
+F4E7:	LDA #$10
+F4E9:	JSR $F757	; Set Status Bit
+F4EC:	BNE $F4F1
+
+F4EE:	JSR $F7BF
+
+F4F1:	INC $AE 	; Tape end address / End of program
+F4F3:	BNE $F4FD
+F4F5:	INC $AF
+F4F7:	LDA $AF
+F4F9:	CMP #$FF
+F4FB:	BEQ $F502
+
+F4FD:	DEC $A5
+F4FF:	BNE $F4C5	; Receive Serial Byte
+F501:	CLC
+
+F502:	RTS
+
+; Toggle Clock Line
+
+F503:	LDA $DD00
+F506:	EOR #$10
+F508:	STA $DD00
+
+F50B:	RTS
+
+; Print 'u0' Disk Reset
+
+F50C:	; '{BLUE}0u'
+
+; Print 'searching'
+
+F50F:	LDA $9D 	; I/O messages: 192 = all, 128 = commands, 64 = errors, 0 = nil
+F511:	BPL $F532
+F513:	LDY #$0C
+F515:	JSR $F722	; Print I/O Message
+F518:	LDA $B7 	; Number of characters in file name
+F51A:	BEQ $F532
+F51C:	LDY #$17
+F51E:	JSR $F722	; Print I/O Message
+
+; Send File Name
+
+F521:	LDY $B7 	; Number of characters in file name
+F523:	BEQ $F532
+F525:	LDY #$00
+
+F527:	JSR $F7AE	; Get Char From Memory
+F52A:	JSR $FFD2	; (ibsout)      Output Vector, chrout [EF79]
+F52D:	INY
+F52E:	CPY $B7 	; Number of characters in file name
+F530:	BNE $F527
+
+F532:	RTS
+
+; Print 'loading'
+
+F533:	LDY #$49
+F535:	LDA $93 	; Work value, monitor, LOAD / SAVE 0 = LOAD, 1 = VERIFY
+F537:	BEQ $F53B
+F539:	LDY #$59
+
+F53B:	JMP $F71E	; Print If Direct
+
+; -save-
+
+F53E:	STX $AE 	; Tape end address / End of program
+F540:	STY $AF
+F542:	TAX
+F543:	LDA $00,X
+F545:	STA $C1
+F547:	LDA $01,X
+F549:	STA $C2
+F54B:	JMP ($0332)	; SAVE Link [F54E]
+
+; -kernalsave-
+
+F54E:	LDA $BA 	; Current device
+F550:	CMP #$01
+F552:	BEQ $F5C8	; Save to Tape
+F554:	CMP #$04
+F556:	BCS $F561
+
+F558:	JMP $F694	; Print 'illegal device no'
+
+F55B:	JMP $F691	; Print 'missing file name'
+F55E:	JMP $F685	; Print 'file not found'
+
+F561:	LDY $B7 	; Number of characters in file name
+F563:	BEQ $F55B
+F565:	LDA #$61
+F567:	STA $B9 	; Current secondary address
+F569:	JSR $F0CB	; Check Serial Open
+F56C:	JSR $F5BC	; Print 'saving'
+F56F:	LDA $BA 	; Current device
+F571:	JSR $E33E	; -listen-
+F574:	LDA $B9 	; Current secondary address
+F576:	JSR $E4D2	; -second-
+F579:	LDY #$00
+F57B:	JSR $ED51	; Reset Pointer
+F57E:	JSR $E503	; -ciout-  Print Serial
+F581:	LDA $AD
+F583:	JSR $E503	; -ciout-  Print Serial
+
+F586:	JSR $EEB7	; Check End Address
+F589:	BCS $F59B
+F58B:	JSR $F7CC
+F58E:	JSR $E503	; -ciout-  Print Serial
+F591:	JSR $FFE1	; (istop)       Test-Stop Vector [F66E]
+F594:	BEQ $F5B5	; Terminate Serial Input
+F596:	JSR $EEC1	; Bump Address
+F599:	BNE $F586
+
+F59B:	JSR $E526	; -unlsn-
+
+F59E:	BIT $B9 	; Current secondary address
+F5A0:	BMI $F5B3
+F5A2:	LDA $BA 	; Current device
+F5A4:	JSR $E33E	; -listen-
+F5A7:	LDA $B9 	; Current secondary address
+F5A9:	AND #$EF
+F5AB:	ORA #$E0
+F5AD:	JSR $E4D2	; -second-
+
+F5B0:	JSR $E526	; -unlsn-
+
+F5B3:	CLC
+F5B4:	RTS
+
+; Terminate Serial Input
+
+F5B5:	JSR $F59E
+F5B8:	LDA #$00
+F5BA:	SEC
+F5BB:	RTS
+
+; Print 'saving'
+
+F5BC:	LDA $9D 	; I/O messages: 192 = all, 128 = commands, 64 = errors, 0 = nil
+F5BE:	BPL $F5F7
+F5C0:	LDY #$51
+F5C2:	JSR $F722	; Print I/O Message
+F5C5:	JMP $F521	; Send File Name
+
+; Save to Tape
+
+F5C8:	JSR $E980	; Get Buffer Address
+F5CB:	BCC $F558
+F5CD:	JSR $E9E9	; Print 'press record ...'
+F5D0:	BCS $F5F7
+F5D2:	JSR $F5BC	; Print 'saving'
+F5D5:	LDX #$03
+F5D7:	LDA $B9 	; Current secondary address
+F5D9:	AND #$01
+F5DB:	BNE $F5DF
+F5DD:	LDX #$01
+
+F5DF:	TXA
+F5E0:	JSR $E919	; Write Tape Header
+F5E3:	BCS $F5F7
+F5E5:	JSR $EA18
+F5E8:	BCS $F5F7
+F5EA:	LDA $B9 	; Current secondary address
+F5EC:	AND #$02
+F5EE:	BEQ $F5F6
+F5F0:	LDA #$05
+F5F2:	JSR $E919	; Write Tape Header
+F5F5:	.BYTE $24
+
+F5F6:	CLC
+
+F5F7:	RTS
+
+

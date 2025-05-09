@@ -1,0 +1,193 @@
+
+
+               ; ---------------------------------------
+               ; print text
+               ; note self-modifying code so we don't use zeropage
+
+txtout          .(
+		sta taddr
+                sty taddr+1
+                ldy #0
+l               lda -1,y
+taddr           = l+1
+                beq t2
+                jsr $ffd2
+                iny
+                bne l
+t2              rts
+		.)
+
+
+
+                ; ---------------------------
+                ; for simplicity, and we only need random data to compare,
+                ; not any scientifically "valid" randomness, we use a
+                ; the PRNG from here https://codebase64.org/doku.php?id=base:small_fast_16-bit_prng
+                ; with a fixed seed of $3d67 to achieve a period of the full 64k
+
+	.(
+rng_s           = 43714
+rng_magic       = $3d67
+
+state           .word 0
+
+&rng_init        lda #<rng_s
+                sta state
+                lda #>rng_s
+                sta state + 1
+                rts
+
+&rng_next
+                 lda state
+                 beq lowZero ; $0000 and $8000 are special values to test for
+
+                 ; Do a normal shift
+                 asl state
+                 lda state+1
+                 rol
+                 bcc noEor
+
+                doEor:
+                  ; high byte is in .A
+                  eor #>rng_magic
+                  sta state+1
+                  lda state
+                  eor #<rng_magic
+                  sta state
+                lda state+1     ; return the high byte of the state
+                  rts
+
+                lowZero:
+                 lda state+1
+                 beq doEor ; High byte is also zero, so apply the EOR
+                           ; For speed, you could store 'magic' into 'state' directly
+                           ; instead of running the EORs
+
+                 ; wasn't zero, check for $8000
+                 asl
+                 beq noEor ; if $00 is left after the shift, then it was $80
+                 bcs doEor ; else, do the EOR based on the carry bit as usual
+
+                noEor:
+                 sta state+1
+                 rts
+	.)
+
+	; ---------------------------------------------
+	; read and print the disk status
+
+read_st .(
+	jsr crout
+
+	lda #0
+	sta STATUS
+
+	lda #DEV
+	jsr TALK
+
+	lda #15+$60
+	jsr SECTALK
+in
+	jsr IECIN
+
+	cmp #$20
+	bcc noprint
+	cmp #$80
+	bcc print
+	cmp #$a0
+	bcs print
+noprint	lda #"."
+print	jsr $ffd2
+	
+	lda STATUS
+	beq in
+
+	jmp UNTALK
+	.)
+
+	; ---------------------------------------------
+	; https://groups.google.com/g/comp.sys.apple2/c/_y27d_TxDHA
+
+print_int16 .(
+23
+24 RomCOut = $FFD2
+25 DEC_DIGITS=5
+
+26 ;-------------------------------
+27 ; Print U16 as decimal via COUT
+28 ; IN: X=hi, A=Lo
+29 ; OUT: X=$FF, Y=$00
+30 ;-------------------------------
+31 DecPrintU16
+32 pha
+33 txa
+34 DecModLen = *+1
+35 MOD: ldx #DEC_DIGITS-1
+36 ldy #<-1
+37 sty DecCtr
+38
+39 Loop: iny
+40 sta DecWord+1
+41 pla
+42 sta DecWord
+43
+44 DoDigit: sec
+45 sbc Power10L-1,x
+46 pha
+47 lda DecWord+1
+48 sbc Power10H-1,x
+49 bcs Loop
+50
+51 GotDigit:
+52 pla
+53 tya
+54 bne PrDigit ;Print all non-zero digits
+55
+56 do DEC_SKIP0
+57 inc DecCtr
+58 bpl NoDigit ;Skip leading zeroes
+66
+67 PrDigit: eor #"0"
+68 jsr RomCOut
+69 ldy #0
+70 NoDigit:
+72 dec DecCtr
+74 lda DecWord
+75 dex
+76 beq PrDigit
+77 bpl DoDigit
+78 rts
+79
+80 Power10L .byt <10,<100,<1000,<10000
+81 Power10H .byt >10,>100,>1000,>10000 
+
+DecCtr	.byt 0
+DecWord	.word 0
+	.)
+
+	; ---------------------------------------------
+
+cout	lda #":"
+	.byt $2c
+crout	lda #13
+	.byt $2c
+spout	lda #" "
+	jmp $ffd2
+
+hexout  .(
+	pha
+        lsr
+        lsr
+        lsr
+        lsr
+        jsr nibout
+        pla
+nibout  and #$0f
+        cmp #10
+        bcc pdec
+        adc #$66
+pdec    eor #$30
+        jmp $FFD2
+	.)
+
+

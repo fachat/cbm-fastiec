@@ -1,0 +1,699 @@
+
+; from https://klasek.at/c64/c128-rom-listing.html
+
+; changes between the C128/C64 and the uPET:
+;	- VIA instead of CIA, but pinout on ATN, CLK, DATA same
+;	- Use port bit 0 for fast serial direction
+;	- The C64 has input bits directly at CIA; uPET has inverters
+
+; The uPET has a Schmitt-Trigger receiver before the data goes
+; to the VIA. So, de-bouncing by reading and comparing is not 
+; necessary. Thus, this:
+;
+;       lda VIA+VIA_PB
+;       cmp VIA+VIA_PB
+;       asl
+;       bcc/bcs/bpl/bmi
+;
+; can be replaced with:
+;
+;       bit VIA+VIA_PB
+;       bpl/bmi/bvc/bvs
+
+
+;	*=$4000
+
+; -------------------------------------------------
+; IO
+
+        jmp SECLISTEN	; fiec_secnd   ; 0
+        jmp SECTALK	; fiec_tksa    ; 1
+        jmp IECIN	; fiec_acptr   ; 2
+        jmp IECOUT	; fiec_ciout   ; 3
+        jmp UNTALK	; fiec_untlk   ; 4
+        jmp UNLISTEN	; fiec_unlsn   ; 5
+        jmp LISTEN	; fiec_listn   ; 6
+        jmp TALK	; fiec_talk    ; 7
+
+; init/meta
+        jmp fiec_init              ; 8   ; 15
+
+VIA	=$e850
+
+T2VAL	=1
+
+VIA_PB	=0
+VIA_PA	=1
+VIA_DDRB=2
+VIA_DDRA=3
+VIA_T2L	=8
+VIA_T2H	=9
+VIA_SR	=10
+VIA_ACR	=11
+VIA_PCR	=12
+VIA_IFR	=13
+VIA_IER	=14
+VIA_PANH=15
+
+VIA_IRQ_SR	=%00000100
+
+P_DATA	=$80
+P_CLK	=$40
+P_DOUT	=$20
+P_COUT	=$10
+P_AOUT	=$08+$02
+P_AIN	=$04
+P_ATNAOUT=$02
+P_FSDIR	=$01
+
+; -------------------------------------------------
+; Memory locations
+
+#ifdef C64
+EOIFL	=$A3
+RXBYT	=$A4
+BITCNT	=$A5
+BUFFLG	=$94
+BYTE	=$95
+STATUS	=$90
+BURST_FLG	=$0A1C	; $80 set when fast; $40 set to indicate BURST mode to caller
+
+#endif
+#ifdef PET
+EOIFL	.byt 0
+RXBYT	.byt 0
+BITCNT	.byt 0
+BUFFLG	.byt 0
+BYTE	.byt 0
+BURST_FLG .byt 0
+#ifldef STATUS
+#else
+STATUS	=$96
+#endif
+#endif
+
+
+; -------------------------------------------------
+; Constants
+
+IEC_TALK	=$40
+IEC_LISTEN	=$20
+IEC_UNTALK	=$5F
+IEC_UNLISTN	=$3F
+
+; -------------------------------------------------
+
+fiec_init: ; TODO
+	lda #$7f
+	sta VIA+VIA_IER
+	sta VIA+VIA_IFR
+	lda #%00111011
+	sta VIA+VIA_DDRB
+	lda #%00000001
+	sta VIA+VIA_PB
+	jsr fastoff		; sets ACR to SR mode 011 (input)
+	lda #$00
+	sta BURST_FLG
+	lda #0
+	sta BUFFLG
+	sta STATUS
+	sta EOIFL
+     	;LDA #$00
+	sta VIA+VIA_PCR
+     	LDA #<T2VAL
+     	STA VIA+VIA_T2L		; set timer for SR
+	LDA #>T2VAL
+     	STA VIA+VIA_T2H
+
+lda #1
+sta VIA+VIA_DDRA
+lda #0
+sta VIA+VIA_PANH
+
+	rts
+
+; -------------------------------------------------
+; -talk-
+
+TALK:
+     	ORA #IEC_TALK
+     	.BYTE $2C
+
+; -listen-
+
+LISTEN:
+     	ORA #IEC_LISTEN
+
+	; ignore
+     	;JSR ILRS232	; Interlock RS-232/Serial
+
+sendatn:
+     	PHA		; save byte
+
+	LDA #0
+	STA STATUS	; clear status
+
+     	BIT BUFFLG	; byte in out buffer?
+     	BPL nobuf	; no, directly to out-with-atn
+
+     	SEC
+     	ROR EOIFL	; set EOI
+     	JSR bytout	; Send Data On Serial Bus
+     	LSR BUFFLG	; clear buffer flag
+     	LSR EOIFL	; clear EOI
+nobuf:
+     	PLA		; restore byte
+     	STA BYTE	; byte to send
+
+     	JSR stabilize	; Stabilize Timing
+
+     	;JSR datahi	; Set Data High
+     	LDA VIA+VIA_PB
+     	AND #P_AOUT	; is ATN already set?
+     	BNE atnison	; yes, skip
+
+	lda #$ff	;; send $ff, i.e. DATA stays high, FCLK (SRQ) toggles
+     	JSR fastout	; Fast Disk On (set SR to output)
+
+     	TXA		; wait loop
+     	LDX #$14	; 143 cycles total (inc. TXA/TAX)
+atnl:
+     	DEX
+     	BNE atnl
+     	TAX
+
+; skip here if ATN is already set
+atnison:
+     	LDA VIA+VIA_PB
+     	ORA #P_AOUT	; set ATN active
+     	STA VIA+VIA_PB
+
+; entry point to send SECLISTEN
+
+doseclisten:
+     	JSR stabilize	; Stabilize Timing
+     	JSR clklo	; Set Clock Low
+     	JSR datahi	; Set Data High
+
+     	TXA		; wait loop
+     	LDX #$B8	; 1291 cycles total (incl. TXA/TAX)
+delay:
+     	DEX
+     	BNE delay
+     	TAX
+
+; Send Data On Serial Bus
+
+bytout:
+     	JSR stabilize	; Stabilize Timing
+     	JSR datahi	; Set Data High
+	lda VIA+VIA_PB
+	bmi devpres	; check if data is high
+     	JMP devnotpres	; if so, no device present
+devpres:
+	LDA VIA+VIA_SR	; clear interrupts
+
+     	JSR clkhi	; Set Clock High
+     	BIT EOIFL	; shall we send EOI?
+     	BPL notxeoi	; no, skip waiting for EOI acknowledge
+
+wdatahi:
+	lda VIA+VIA_PB
+	bmi wdatahi	; wait for DATA high
+
+wdatalo:
+	lda VIA+VIA_PB
+	bpl wdatalo	; wait for DATA low
+
+notxeoi:		; loop waiting for DATA going hi, or rx'ing a fast marker byte
+     	LDA VIA+VIA_PB
+     	PHA
+     	LDA VIA+VIA_IFR
+     	AND #VIA_IRQ_SR	; check if SR has received a byte
+     	BEQ slowdrv	; no, then skip
+
+     	LDA #$C0	; set flag that drive is FAST
+     	STA BURST_FLG	; Fast Serial Internal/External Flag
+
+slowdrv:
+     	PLA
+     	bmi notxeoi	; wait for DATA high (note: we did not do an ASL)
+
+     	ORA #P_COUT	; When device has set CLK high, set CLK low ourself
+     	STA VIA+VIA_PB
+     	AND #P_AOUT	; is ATN output active?
+     	BNE txslow	; yes, then skip
+
+     	BIT BURST_FLG	; Fast Serial Internal/External Flag
+     	BPL txslow	; not fast, then skip
+
+	lda BYTE
+     	JSR fastout	; Fast Disk On
+
+     	JMP endtx	; finish sending via SR
+
+; send slow byte
+txslow:
+     	LDA #$08
+     	STA BITCNT
+
+	.assert P_DATA == $80, "Bit check mismatch"
+
+txsl1:
+     	LDA VIA+VIA_PB
+	bmi timeout	; if DATA is low, return send timeout
+
+     	ROR BYTE	; set DATA out to bit
+     	BCS hiout
+     	JSR datalo	; Set Data Low
+     	BNE clkout
+
+hiout:
+     	JSR datahi	; Set Data High
+
+clkout:
+     	JSR clkhi	; Set Clock High
+     	NOP
+     	NOP
+     	NOP
+     	NOP
+     	LDA VIA+VIA_PB
+     	AND #255-P_DOUT	; DATA high again
+     	ORA #P_COUT	; CLK low again
+     	STA VIA+VIA_PB
+     	DEC BITCNT	; next bit
+     	BNE txsl1
+
+; finish sending via SR
+
+endtx:
+     	TXA
+     	PHA
+     	LDX #73		; loop to wait for response (originally 34)
+w0:	; original loop takes 28 cycles, new 13
+	lda VIA+VIA_PB
+	bpl w1		; wait for DATA low
+
+     	PLA
+     	TAX		; restore X
+     	JMP restore	; Restore Timing, return
+
+w1:
+     	DEX
+     	BNE w0
+     	PLA
+     	TAX
+
+; -------------------------------------------------
+timeout:
+     	LDA #$03	; send timeout error
+     	.BYTE $2C
+
+devnotpres:
+     	LDA #$80	; Device not present error
+errout:
+     	PHA
+     	LDA BURST_FLG	; Fast Serial Internal/External Flag
+     	AND #$7F
+     	STA BURST_FLG	; Fast Serial Internal/External Flag
+     	PLA
+     	JSR SETST	; Set Status Bit
+     	JSR restore	; Restore Timing
+     	CLC
+     	JMP resatn	; Reset ATN
+
+; -------------------------------------------------
+; -acptr-
+
+IECIN
+     	JSR stabilize	; Stabilize Timing
+
+     	LDA #$00
+     	STA BITCNT
+	LDA #VIA_IRQ_SR
+	STA VIA+VIA_IFR	; clear interrupts
+
+     	TXA
+     	PHA		; save XR
+
+     	JSR clkhi	; Set Clock High
+
+inm1
+	bit VIA+VIA_PB
+	bvs inm1	; wait for CLK high (from sender)
+
+in0:
+     	;LDA VIA+VIA_PB
+     	;AND #255-P_DOUT	; set DATA high
+     	;STA VIA+VIA_PB
+	jsr datahi
+
+dh	bit VIA+VIA_PB
+	bmi dh		; wait DATA high (from other receivers)
+
+     	LDX #20		; 20 iterations to wait for DATA low  (was 13, but loop got faster)
+in1:			; originally 17 cycles, now 11
+	bit VIA+VIA_PB
+	bvs rxdata	; if CLK is low, continue (to E484)
+
+     	DEX
+     	BNE in1		; next try
+
+     	LDA BITCNT
+     	BNE in2		; EOI already received, then read timeout
+
+     	JSR datalo	; Set Data Low
+
+	jsr clkhi
+
+     	LDA #$40
+     	JSR SETST	; Set Status Bit to EOI
+     	INC BITCNT	; set flag for EOI received
+     	BNE in0		; always
+
+in2:
+     	PLA
+     	TAX		; restore X
+     	LDA #$02	; read timeout
+     	JMP errout
+
+; receive byte
+
+rxdata:
+     	LDX #$08	; bit count
+rx0:
+     	LDA VIA+VIA_IFR
+     	AND #VIA_IRQ_SR	; is SR receive interrupt set?
+     	BNE rxfast	; yes, then receive fast byte
+
+	; wait for 1st slow bit (while checking for fast rx)
+rxsl1:
+     	LDA VIA+VIA_PB
+     	ASL		; put DATA into C
+     	bmi rx0		; wait for CLK high
+
+	; slow receive
+rxnxt:
+     	ROR RXBYT	; save DATA in received byte
+rxsl2:
+	bit VIA+VIA_PB
+	bvc rxsl2	; wait for CLK lo
+
+     	DEX		; next bit
+     	BEQ rxend
+rxsl3:
+     	LDA VIA+VIA_PB
+     	ASL		; put DATA into C
+     	bmi rxsl3:	; wait CLK high
+     	bpl rxnxt	; always, save next bit
+
+	; receive fast byte
+rxfast:
+     	LDA VIA+VIA_SR
+	eor #$ff
+     	STA RXBYT
+     	LDA #$C0
+     	STA BURST_FLG	; Fast Serial Internal/External Flag
+
+; end slow/fast receive
+
+rxend:
+     	PLA
+     	TAX
+;nop:nop:nop:nop:nop:nop:nop
+     	JSR datalo	; Set Data Low
+     	BIT STATUS 	; Status word ST
+     	BVC rxe1
+     	JSR resclkdata	; reset CLK+DATA
+rxe1:
+     	JSR restore	; Restore Timing
+     	LDA RXBYT
+	eor #$ff
+; this delay seems to break fast DIR
+;nop:nop:nop:nop:nop:nop:nop
+;cmp #%10010101
+;cmp #%00101011
+;bne xx
+;inc VIA+VIA_PANH
+;xx:
+     	CLC
+     	RTS
+
+; -------------------------------------------------
+; -second-
+
+SECLISTEN
+     	STA BYTE
+     	JSR doseclisten
+
+; -------------------------------------------------
+; Set ATN High
+
+atnhi:
+     	LDA VIA+VIA_PB
+     	AND #255-P_AOUT
+     	STA VIA+VIA_PB
+     	RTS
+
+; -------------------------------------------------
+; -tksa-
+
+SECTALK
+     	STA BYTE
+     	JSR doseclisten
+     	BIT STATUS 	; Status word ST
+     	BMI resatn	; Reset ATN
+
+     	JSR stabilize	; Stabilize Timing
+     	JSR datalo	; Set Data Low
+     	JSR atnhi	; Set ATN High
+     	JSR clkhi	; Set Clock High
+
+talk1:
+	bit VIA+VIA_PB
+	bvc talk1	; wait for CLK lo
+     	JMP restore	; Restore Timing
+
+; -ciout-  Print Serial
+
+IECOUT
+     	BIT BUFFLG	; is there a byte in the buffer?
+     	BMI out0	; if yes, then send it
+     	SEC		; if not, ...
+     	ROR BUFFLG	; set flag for byte in buffer
+     	BNE retbyt	; (always) store byte and end
+out0:
+     	PHA		; save new byte
+     	JSR bytout	; Send Data from buffer On Serial Bus
+     	PLA
+
+retbyt:
+     	STA BYTE	; store new byte into buffer
+     	CLC
+     	RTS
+
+; -------------------------------------------------
+; -untlk-
+UNTALK
+     	JSR stabilize	; Stabilize Timing
+     	JSR clklo	; Set Clock Low
+     	LDA VIA+VIA_PB
+     	ORA #P_AOUT	;$08
+     	STA VIA+VIA_PB
+     	LDA #$5F
+     	.BYTE $2C
+
+; -unlsn-
+UNLISTEN
+     	LDA #$3F
+     	PHA
+     	LDA BURST_FLG	; Fast Serial Internal/External Flag
+     	AND #$7F
+     	STA BURST_FLG	; Fast Serial Internal/External Flag
+     	PLA
+     	JSR sendatn
+
+; -------------------------------------------------
+; low level routines
+
+; Reset ATN
+
+resatn:
+     	JSR atnhi	; Set ATN High
+
+resclkdata
+     	TXA
+     	LDX #$0A
+
+rs1:
+     	DEX
+     	BNE rs1
+     	TAX
+     	JSR clkhi	; Set Clock High
+     	JMP datahi	; Set Data High
+
+; Set Clock High
+
+clkhi:
+     	LDA VIA+VIA_PB
+     	AND #255-P_COUT	; $EF
+     	STA VIA+VIA_PB
+     	RTS
+
+; Set Clock Low
+
+clklo:
+     	LDA VIA+VIA_PB
+     	ORA #P_COUT	; $10
+     	STA VIA+VIA_PB
+     	RTS
+
+; Set Data High
+
+datahi:
+     	LDA VIA+VIA_PB
+     	AND #255-P_DOUT	; $DF
+     	STA VIA+VIA_PB
+     	RTS
+
+; Set Data Low
+
+datalo:
+     	LDA VIA+VIA_PB
+     	ORA #P_DOUT	; $20
+     	STA VIA+VIA_PB
+     	RTS
+
+; Read Serial Lines
+
+; return DATA in C, CLK in N-flag
+	.assert P_DATA == $80, "Bit check mismatch"
+	.assert P_CLK == $40, "Bit check mismatch"
+;readiec:
+;     	LDA VIA+VIA_PB
+;     	ASL
+;     	RTS
+
+; -------------------------------------------------
+; Stabilize Timing
+; 
+; SAVE_FAST stores a copy of the VIC-IIe FAST register
+; As unused bits read '1', bit 7 is usually set.
+; Except when we clear SAVE_FAST. This is used to 
+; indicate if we have previously checked the speed.
+;
+
+stabilize:
+	sei
+	rts
+;E573:	SEI
+;
+;E574:	BIT $0A3A	; flag $0a3a.7 set?
+;E577:	BMI stabend	; yes, then end
+;E579:	BIT SAVE_FAST	; have we checked speed before?
+;E57C:	BMI stabend	; yes, then end
+;
+;E57E:	LDA VIC+VIC_FAST	; VIC-IIe FAST; bit 0 set is 2MHz
+;E581:	STA SAVE_FAST	; save value (sets bit 7 - unused bits read 1)
+;E584:	LDA VIC+VIC_SPRT	; Sprite enable register
+;E587:	STA SAVE_SPRT	; save value
+;
+;E58A:	LDA #$00	
+;E58C:	STA VIC+VIC_SPRT	; disable all sprites
+;E58F:	STA VIC+VIC_FAST	; go to slow mode
+;
+;E592:	LDA SAVE_SPRT	; have any sprites been enabled?
+;E595:	BEQ stabend	; no, then end
+;E597:	TXA		; otherwise delay at least one rasterline
+;E598:	LDX #$00
+;
+;stab0:
+;E59A:	DEX
+;E59B:	BNE stab0
+;E59D:	TAX
+;
+;stabend:
+;E59E:	RTS
+;
+; Restore Timing
+
+restore:
+;	cli
+	rts
+;E59F:	BIT $0A3A	; flag $0a3a.7 is set?
+;E5A2:	BMI restend	; yes then end
+;E5A4:	BIT SAVE_FAST	; timing changed (from Stabilize timing above)?
+;E5A7:	BPL restend	; no then end
+;
+;E5A9:	LDA SAVE_SPRT
+;E5AC:	STA VIC+VIC_SPRT
+;E5AF:	LDA SAVE_FAST
+;E5B2:	STA VIC+VIC_FAST
+;E5B5:	LDA #$00	; store zero in FAST store byte
+;E5B7:	STA SAVE_FAST	; make sure next time we check timing
+;
+;restend:
+;E5BA:	CLI
+;E5BB:	RTS
+
+; -------------------------------------------------
+; Prepare For Response
+
+
+; Fast Disk On
+
+fastout:
+	sta VIA+VIA_SR		; "each read and write will trigger a shift..."
+
+	lda VIA+VIA_PB		; enable fast serial _output_
+	and #255-P_FSDIR
+	sta VIA+VIA_PB
+
+	sta VIA+VIA_T2H		; restart the timer
+
+#if T2VAL > 1
+	; make sure T2 underflows before we set to send
+	; This check/loop is only needed iff T2VAL is high enough to NOT underflow
+	; between store to T2H above and store to ACR below
+;	lda #%00100000
+;f1	bit VIA+VIA_IFR
+;	beq f1
+#endif
+
+	; here T2L must have underflown to $ff and below, to make sure shift does not 
+	; automatically start on the next underflow until we set the next data value
+	
+	LDA #%00010100		; shift out under T2 control
+	STA VIA+VIA_ACR
+
+	sta VIA+VIA_T2H		; restart the timer. This sheds about 230us from the duration
+
+	; wait for finished byte, then switch off fast serial
+	; (can this be optimized?)
+	LDA #VIA_IRQ_SR
+p4r	BIT VIA+VIA_IFR
+     	BEQ p4r			; Prepare For Response
+	sta VIA+VIA_IFR
+
+; Fast Disk Off
+
+fastoff:
+	LDA #%00001100		; shift in under ext clock
+	STA VIA+VIA_ACR
+
+	lda VIA+VIA_PB		; enable fast serial _input_
+	ora #P_FSDIR
+	sta VIA+VIA_PB
+     	RTS
+	rts
+
+
+SETST:	
+	ora STATUS
+	sta STATUS
+	rts
+
+; -------------------------------------------------
+; -------------------------------------------------
+
+
