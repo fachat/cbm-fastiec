@@ -3,7 +3,6 @@
  * read and list the catalog (directory) of the disk
  */
 
-DEV	=10
 
 	.word $0401
 	*=$0401
@@ -15,6 +14,9 @@ eol	.word 0			; BASIC link pointer, 0 means end of code
 	.dsb 1040-*
 
 start
+	lda #DEV
+	sta curdev
+
 	jsr fiec_init
 
 	jsr read_dir
@@ -29,7 +31,7 @@ read_dir .(
 	
 	; open the file
 
-        lda #DEV
+        lda curdev
         jsr LISTEN
 
         lda #$f0	; open secondary address 0
@@ -49,7 +51,7 @@ read_dir .(
 	; TODO break on error
 
 	; read the directory
-	lda #DEV
+	lda curdev
 	jsr TALK
 
 	lda #$60	; secondary address 0
@@ -61,7 +63,7 @@ read_dir .(
 line	jsr crout
 
 	jsr UNTALK
-	lda #DEV
+	lda curdev
 	jsr TALK
 	lda #$60
 	jsr SECTALK
@@ -84,7 +86,7 @@ doline
 	jsr spout	
 char	
 	jsr UNTALK
-	lda #DEV
+	lda curdev
 	jsr TALK
 	lda #$60
 	jsr SECTALK
@@ -109,7 +111,7 @@ end	jsr UNTALK
 
 	; close file
 close
-	lda #DEV
+	lda curdev
 	jsr LISTEN
 	lda #$e0	; close secondary 0
 	jsr SECLISTEN

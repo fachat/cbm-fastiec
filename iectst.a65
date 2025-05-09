@@ -3,8 +3,6 @@
  * 
  */
 
-DEV	=9
-
 	.word $0401
 	*=$0401
 
@@ -19,6 +17,9 @@ eol	.word 0			; BASIC link pointer, 0 means end of code
 #include CORE
 
 start
+	lda #DEV
+	sta curdev
+
 inc $8000+39
 	jsr fiec_init
 
@@ -30,7 +31,7 @@ inc $8000+39
 	jsr $ffd2
 
 inc $8000+38
-	lda #DEV
+	lda curdev
 	jsr TALK
 
 	lda STATUS

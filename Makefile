@@ -1,4 +1,5 @@
 
+DEV=9	# unit number to use
 
 DOSFILES=dostst dosi0 doscat dosmkdata dosvfdata dosfmt dosscr dosval 
 CBMFILES=cbmtst cbmi0 cbmcat cbmmkdata cbmvfdata cbmfmt cbmscr cbmval
@@ -20,13 +21,13 @@ dosromldr: dosromldr.a65 dosromcomp.a65 upet-fiec-core.a65
 	xa -XMASM -w -P $@.lst -DPET -o $@ $<
 
 $(CBMFILES): cbm%: iec%.a65 cbm-core.a65 common.a65
-	xa -XMASM -w -P $@.lst -DPET -DCORE=cbm-core.a65 -o $@ $<
+	xa -XMASM -w -P $@.lst -DPET -DDEV=$(DEV) -DCORE=cbm-core.a65 -o $@ $<
 
 $(DOSFILES): dos%: iec%.a65 cbm-core.a65 common.a65
-	xa -XMASM -w -P $@.lst -DPET -DCORE=upet-fiec-core.a65 -o $@ $<
+	xa -XMASM -w -P $@.lst -DPET -DDEV=$(DEV) -DCORE=upet-fiec-core.a65 -o $@ $<
 
 $(ESRFILES): esr%: iec%.a65 cbm-core.a65 common.a65
-	xa -XMASM -w -P $@.lst -DPET -DCORE=upet-fiec-esr-core.a65 -o $@ $<
+	xa -XMASM -w -P $@.lst -DPET -DDEV=$(DEV) -DCORE=upet-fiec-esr-core.a65 -o $@ $<
 
 clean:
 	rm -f *.bin *.lst

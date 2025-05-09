@@ -1,9 +1,9 @@
 
 /*
+ * Initialize drive 0
  */
 
 
-DEV	=10
 
 	.word $0401
 	*=$0401
@@ -19,6 +19,11 @@ eol	.word 0			; BASIC link pointer, 0 means end of code
 #include CORE
 
 start
+	lda #DEV
+	sta curdev
+
+	jsr fiec_init
+
 inc $8000+39
 
 	.(
@@ -29,7 +34,7 @@ inc $8000+39
 	jsr $ffd2
 
 inc $8000+38
-	lda #DEV
+	lda curdev
 	jsr LISTEN
 
 	lda STATUS

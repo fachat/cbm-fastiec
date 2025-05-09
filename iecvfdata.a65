@@ -3,7 +3,6 @@
  * Verify a file with 64k of pseudo random data
  */
 
-DEV	=10
 
 	.word $0401
 	*=$0401
@@ -19,6 +18,10 @@ eol	.word 0			; BASIC link pointer, 0 means end of code
 #include CORE
 
 start
+	lda #DEV
+	sta curdev
+
+	jsr fiec_init
 
 	jsr vf64kfile
 
@@ -38,7 +41,7 @@ vf64kfile .(
 	
 	; open the file
 
-        lda #DEV
+        lda curdev
         jsr LISTEN
 
         lda #$f0	; open secondary address 1 (save)
@@ -76,7 +79,7 @@ le
 	sta STATUS
 
 	; write the file
-	lda #DEV
+	lda curdev
 	jsr TALK
 
 	lda #$60	; secondary address 0
@@ -145,7 +148,7 @@ end	jsr UNTALK
 
 	; close file
 close
-	lda #DEV
+	lda curdev
 	jsr LISTEN
 	lda #$e0	; close secondary 0
 	jsr SECLISTEN

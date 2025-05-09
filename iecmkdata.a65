@@ -3,8 +3,6 @@
  * creates a 64k size file with pseudo-random data
  */
 
-DEV	=10
-
 	.word $0401
 	*=$0401
 
@@ -19,6 +17,10 @@ eol	.word 0			; BASIC link pointer, 0 means end of code
 #include CORE
 
 start
+	lda #DEV
+	sta curdev
+
+	jsr fiec_init
 
 	jsr mk64kfile
 
@@ -34,7 +36,7 @@ mk64kfile .(
 	
 	; open the file
 
-        lda #DEV
+        lda curdev
         jsr LISTEN
 
         lda #$f1	; open secondary address 1 (save)
@@ -61,7 +63,7 @@ le
 	sta counter+1
 
 	; write the file
-	lda #DEV
+	lda curdev
 	jsr LISTEN
 
 	lda #$61	; secondary address 0
@@ -80,7 +82,7 @@ end	jsr UNLISTEN
 
 	; close file
 close
-	lda #DEV
+	lda curdev
 	jsr LISTEN
 	lda #$e1	; close secondary 0
 	jsr SECLISTEN

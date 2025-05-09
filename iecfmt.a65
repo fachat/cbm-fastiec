@@ -3,7 +3,6 @@
  * Format a disk
  */
 
-DEV	=9
 
 	.word $0401
 	*=$0401
@@ -19,6 +18,9 @@ eol	.word 0			; BASIC link pointer, 0 means end of code
 #include CORE
 
 start
+	lda #DEV
+	sta curdev
+
 	jsr fiec_init
 
 	jsr send_cmd
@@ -32,7 +34,7 @@ send_cmd
 	lda #0
 	sta STATUS
 
-	lda #DEV
+	lda curdev
 	jsr LISTEN
 
 	lda #15+$60

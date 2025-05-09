@@ -82,7 +82,7 @@ read_st .(
 	lda #0
 	sta STATUS
 
-	lda #DEV
+	lda curdev
 	jsr TALK
 
 	lda #15+$60

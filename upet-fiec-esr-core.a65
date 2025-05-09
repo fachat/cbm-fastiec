@@ -23,6 +23,7 @@
 ;       bit VIA+VIA_PB
 ;       bpl/bmi/bvc/bvs
 
+curdev  =$d4
 
 ;	*=$4000
 
