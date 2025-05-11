@@ -62,8 +62,11 @@ understand how the fast serial works.
 Currently only those targets are supported:
 
 Ulti-PET::
-	using the VIA SR for receiving and sending
+	using the VIA SR for receiving and sending (incl. the Phi2 clock fix for the VIA SR)
+	https://github.com/fachat/cbm_ultipet
 Ultra-CPU + Ultra-BUS + CS/A IECUART board::
 	either using the VIA SR or an external hardware shift register for receiving
+	http://www.6502.org/users/andre/csa/iecuart/index.html
+	(Note that this board contains options for both solutions)
 
 
